@@ -1,0 +1,957 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Уровни · скринер и симулятор (движок робота v9.3)</title>
+<style>
+:root{--bg:#141922;--panel:#1a2230;--line:#293244;--ink:#d9dfe8;--dim:#8d97a7;--dimmer:#5d6778;
+  --amber:#e0a54a;--amber-soft:rgba(224,165,74,.16);--green:#4fb08c;--rose:#d96b7a;--blue:#5b8def;--chalk:#f1f3f6}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 "Segoe UI",Roboto,system-ui,-apple-system,sans-serif;font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit;color:var(--ink);background:#111722;border:1px solid var(--line);border-radius:4px;padding:5px 8px}
+button{cursor:pointer;background:#232c3d}
+button.primary{background:var(--amber);color:#1a1408;border-color:var(--amber);font-weight:600}
+button:disabled{opacity:.45;cursor:default}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+h1{font-size:19px;font-weight:600;margin:0}
+header{padding:14px 18px 10px;border-bottom:1px solid var(--line)}
+.head-row{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.sub{color:var(--dim);font-size:13px}
+.controls{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px 18px;margin-top:12px}
+.controls label{display:block;color:var(--dim);font-size:12px;margin-bottom:3px}
+.controls .row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
+.controls .row>div{min-width:96px}
+.controls input,.controls select{width:100%}
+textarea#tickers{width:100%;height:58px;resize:vertical}
+.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+#progress{color:var(--dim);font-size:13px;min-height:18px}
+main{display:grid;grid-template-columns:minmax(300px,380px) 1fr;min-height:60vh}
+#left{border-right:1px solid var(--line);overflow:auto;max-height:78vh}
+#right{display:flex;flex-direction:column;min-width:0}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:5px 8px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--dim);font-weight:500;position:sticky;top:0;background:var(--bg)}
+tr.pick{cursor:pointer}
+tr.pick:hover{background:#1f2839}
+tr.sel{background:#243049}
+td.r{text-align:right}
+.ok{color:var(--green)}.no{color:var(--dim)}.warn{color:var(--amber)}.bad{color:var(--rose)}
+#chartWrap{position:relative;background:#10151d}
+canvas#chart{display:block;width:100%;height:440px;cursor:grab}
+#chartHint{position:absolute;right:10px;top:8px;color:var(--dimmer);font-size:12px}
+#explain{padding:12px 16px;border-top:1px solid var(--line);font-size:13px;line-height:1.5;min-height:110px;white-space:pre-wrap}
+#explain b{color:var(--chalk)}
+#stats{border-top:1px solid var(--line);padding:12px 18px;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+#stats h2{font-size:15px;font-weight:600;margin:0 0 8px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:6px 14px;font-size:13px}
+.kpis div span{color:var(--dim);display:block;font-size:12px}
+canvas#equity{width:100%;height:150px;display:block;background:#10151d;margin-top:8px}
+#trades{max-height:320px;overflow:auto;grid-column:1/-1}
+.legend{display:flex;gap:14px;flex-wrap:wrap;color:var(--dim);font-size:12px;padding:6px 16px;border-top:1px solid var(--line)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:2px;vertical-align:-2px;margin-right:4px}
+footer{padding:12px 18px 20px;border-top:1px solid var(--line);color:var(--dim);font-size:12px;line-height:1.55;max-width:960px}
+@media (max-width:900px){main{grid-template-columns:1fr}#left{max-height:36vh;border-right:0;border-bottom:1px solid var(--line)}.controls{grid-template-columns:1fr}#stats{grid-template-columns:1fr}canvas#chart{height:320px}#chartHint{display:none}.kpis{grid-template-columns:repeat(2,1fr)}th,td{padding:6px 6px}}
+canvas#chart{touch-action:none}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div class="head-row">
+    <h1>Уровни: скринер и симулятор</h1>
+    <span class="sub">движок торгового робота v9.3 без изменений · данные Finam (реальное время) или MOEX ISS · часовики и дневки</span>
+  </div>
+  <div class="controls">
+    <div>
+      <label for="tickers">Бумаги TQBR (через запятую или пробел)</label>
+      <textarea id="tickers">SBER, GAZP, LKOH, ROSN, NVTK, GMKN, TATN, SNGS, SNGSP, MTSS, MGNT, PLZL, CHMF, NLMK, MAGN, ALRS, VTBR, MOEX, YDEX, OZON, AFLT, FLOT, SIBN, PIKK, POSI, PHOR, RUAL, IRAO, HYDR, RTKM, MTLR, AFKS, BSPB, TATNP, SBERP, TRNFP, X5, T, ASTR, SVCB</textarea>
+      <div class="actions">
+        <button id="btnTop">Взять топ по обороту с биржи</button>
+        <input id="topN" value="40" style="width:64px" title="сколько бумаг">
+      </div>
+    </div>
+    <div class="row">
+      <div><label for="from">Период с</label><input id="from" type="date"></div>
+      <div><label for="till">по</label><input id="till" type="date"></div>
+      <div><label for="horizon">Горизонт</label>
+        <select id="horizon"><option value="intra">внутри дня, модель на часовиках</option><option value="swing">свинг, модель на дневках</option></select></div>
+      <div><label for="tmin">Оборот, млн ₽ в день, не меньше</label><input id="tmin" value="100"></div>
+    </div>
+    <div class="row">
+      <div><label for="comm">Комиссия, % за сторону</label><input id="comm" value="0.04"></div>
+      <div><label for="npos">Позиций одновременно</label><input id="npos" value="2"></div>
+      <div><label for="wait">Пауза между запросами, мс</label><input id="wait" value="120"></div>
+      <div style="min-width:220px"><label for="ftok">Токен Finam: бары в реальном времени (без него — ISS, задержка 15 мин)</label><input id="ftok" type="password" autocomplete="off" spellcheck="false" placeholder="tapi_sk_…"></div>
+    </div>
+  </div>
+  <div class="actions">
+    <button id="btnLoad" class="primary">Загрузить данные</button>
+    <button id="btnScreen" disabled>Скринер: разобрать на последнем баре</button>
+    <button id="btnSim" disabled>Симуляция: прогнать период</button>
+    <button id="btnCsv" disabled>Сделки в CSV</button>
+    <span id="progress">Данные не загружены. Укажи бумаги и период, затем «Загрузить данные».</span>
+  </div>
+</header>
+<main>
+  <section id="left"><table id="list"><thead><tr><th>Бумага</th><th>Итог</th><th class="r">R</th></tr></thead><tbody><tr><td colspan="3" class="no">Здесь появятся результаты скринера или сделки симуляции.</td></tr></tbody></table></section>
+  <section id="right">
+    <div id="chartWrap"><canvas id="chart"></canvas><div id="chartHint">колесо — масштаб, перетаскивание — сдвиг</div></div>
+    <div class="legend"><span><i style="background:var(--amber-soft);border:1px solid var(--amber)"></i>зона дневного уровня</span><span><i style="background:var(--green)"></i>лонг</span><span><i style="background:var(--rose)"></i>шорт</span><span><i style="background:var(--chalk)"></i>стоп · вход · тейк</span><span><i style="background:var(--blue)"></i>касание уровня (БСУ/БПУ)</span></div>
+    <div id="explain">Выбери бумагу слева, чтобы увидеть график, уровни и разбор по правилам методики.</div>
+  </section>
+</main>
+<section id="stats">
+  <div><h2>Статистика по всем бумагам (без лимитов портфеля)</h2><div class="kpis" id="kRaw"></div></div>
+  <div><h2>Портфель с правилами робота: не больше N позиций, три стопа подряд — конец дня</h2><div class="kpis" id="kPort"></div><canvas id="equity"></canvas></div>
+  <div id="trades"></div>
+</section>
+<footer>
+  <b>Что здесь считается.</b> Уровни и расчётный ATR — по дневным барам, закрытым до момента решения (без подглядывания вперёд). Модель отбоя, пробоя и ложного пробоя — на часовиках основной сессии (внутри дня) или на дневках (свинг), функция в функцию как в роботе v9.3: БСУ с любой стороны уровня, БПУ1 точно, БПУ2 с люфтом, поджатие и выравнивающий бар, импульс по пробойному бару, стрик и хвосты сложного ЛП, память о проколах по всем сессиям, контртрендовая сделка от расчётного стопа 0,1%. Ворота те же: пять стопов в ATR, шесть стопов до цели, технический ATR не меньше расчётного, стоп не больше расчётного +20% (ЛП +30%), правило 75–80% по направлению сделки, первый час без отбоя, за 40 минут до конца сессии входов нет. Решение принимается через 90 секунд после закрытия бара, как у робота. Тейк — 3R.<br>
+  <b>Как исполняется.</b> Отбой — лимитка у уровня; пробой и ЛП — условная заявка с проскальзыванием, уже заложенным в стоп. Если в одном баре цена дошла и до входа, и до стопа — считается стоп (пессимистично). Гэп через стоп исполняется по открытию. Неисполненная заявка снимается, когда закрытие бара ушло на два стопа, когда уровень пробит и с концом основной сессии; внутридневная позиция закрывается по закрытию последнего бара сессии; свинговая — стопом, тейком или через семь календарных дней. Комиссия переводится в доли R: при стопе 0,2% цены 0,04% за сторону съедает 0,4R за круг — это и есть главный враг часовой торговли, смотри разницу «брутто» и «нетто».<br>
+  <b>Источники.</b> С токеном Finam бары приходят из Finam Trade API в реальном времени — тем же путём, что у робота; токен живёт только в памяти страницы и уходит только на api.finam.ru. Без токена данные берутся из открытого MOEX ISS, где бесплатные котировки отстают на 15 минут: для истории и симуляции это неважно, для скринера на последнем баре — критично.<br>
+  <b>Чего тут нет.</b> Объёма позиции в деньгах и лотности (всё в R), недельного подтверждения уровня (у робота оно только повышает оценку), новостей, реального стакана. Это учебный инструмент для проверки логики, а не инвестиционная рекомендация.
+</footer>
+<script>
+/* ==================== ДВИЖОК РОБОТА v9.3 (вставлен без изменений) ==================== */
+let DECS=2;
+const fmt=(x,d)=>x==null||!isFinite(x)?"—":x.toLocaleString("ru-RU",{minimumFractionDigits:d??DECS,maximumFractionDigits:d??DECS});
+const med=a=>{const s=[...a].sort((x,y)=>x-y),n=s.length;return n?(n%2?s[n>>1]:(s[n/2-1]+s[n/2])/2):0};
+const clamp=(x,lo,hi)=>Math.min(Math.max(x,lo),hi);
+const rstep=(x,s)=>s>0?Math.round(x/s)*s:x;
+const qdir=(x,s,down)=>s>0?(down?Math.floor((x+1e-9)/s):Math.ceil((x-1e-9)/s))*s:x;
+const money=x=>Math.round(x).toLocaleString("ru-RU");
+const DEF={calcStopPct:0.2,luftPct:20,capTech:1.2,stopsToTarget:6,minRR:3,dayUsedMax:75,zoneAtr:0.12};
+const CFG={
+  atrWinD:5, paraHi:2.0, paraLo:1/3,
+  stopMaxPctAtrD:20, stopSoftPctAtrD:10,
+  pivotWin:2, minPivots:3, maxLevels:6,
+  lookbackD:250, minDailyBars:120, minHourBars:45,
+  freshWin:100, maxCrossings:5, maxLevelAgeD:120,
+  nearAtrD:0.45, watchAtrD:1.8, impulseAtr:2.0, counterTrendTight:true,
+  gapAtr:1.0, maxGaps:12, depthD:360, depthH:29,
+  ...DEF
+};
+const SW={minRAtr:0.15,maxRAtr:0.20,fbRAtr:0.26};
+function atrOf(cs,win,useTR){
+  cs=cs.filter(c=>!c.partial);
+  if(cs.length<win+5)return null;
+  const rs=cs.map((c,i)=>(useTR&&i)?Math.max(c.h-c.l,Math.abs(c.h-cs[i-1].c),Math.abs(c.l-cs[i-1].c)):c.h-c.l);
+  const base=med(rs.slice(-Math.max(20,win*3)));
+  const keep=[];
+  for(let i=rs.length-1;i>=0&&keep.length<win;i--){
+    if(base>0&&(rs[i]>=CFG.paraHi*base||rs[i]<=base*CFG.paraLo))continue;
+    keep.push(rs[i]);
+  }
+  return keep.length?{atr:keep.reduce((a,b)=>a+b,0)/keep.length}:null;
+}
+function pivotsOf(cs){const w=CFG.pivotWin,out=[];
+  for(let i=w;i<cs.length-w;i++){const sl=cs.slice(i-w,i+w+1);
+    if(cs[i].h>=Math.max(...sl.map(x=>x.h)))out.push({p:cs[i].h,i,type:"h"});
+    if(cs[i].l<=Math.min(...sl.map(x=>x.l)))out.push({p:cs[i].l,i,type:"l"})}
+  return out}
+function roundish(x,step){const mag=x<10?0.1:x<100?0.5:x<1000?5:50;
+  return Math.abs(x-Math.round(x/mag)*mag)<=Math.max(step,mag*0.06)}
+function levelsOf(cs,price,atr,step,cstop){
+  const data=cs.slice(-CFG.lookbackD);
+  if(data.length<40||!(atr>0))return[];
+  const piv=pivotsOf(data);if(piv.length<CFG.minPivots)return[];
+  const w=clamp(atr*CFG.zoneAtr,2*step,Math.max(cstop,2*step));
+  const cand=piv.map(a=>({c:a.p,near:piv.filter(b=>Math.abs(b.p-a.p)<=w)})).sort((x,y)=>y.near.length-x.near.length);
+  const acc=[];
+  for(const k of cand){
+    if(k.near.length<CFG.minPivots)break;
+    if(acc.some(a=>Math.abs(a.mid-k.c)<w*1.5))continue;
+    const ps=k.near.map(x=>x.p),idx=k.near.map(x=>x.i).sort((a,b)=>a-b);
+    const lo=Math.min(...ps),hi=Math.max(...ps),mid=(lo+hi)/2;
+    const highs=k.near.filter(x=>x.type==="h").length,lows=k.near.length-highs;
+    let side=0,crossings=0,lastBreak=-1,falseBreaks=0;
+    const fresh=Math.max(0,data.length-CFG.freshWin);
+    data.forEach((c,i)=>{const s=c.c>hi?1:c.c<lo?-1:0;
+      if(s!==0){if(side!==0&&s!==side){if(i>=fresh)crossings++;lastBreak=i}side=s}
+      if(c.h>hi&&c.c<=hi)falseBreaks++;if(c.l<lo&&c.c>=lo)falseBreaks++});
+    const lastPiv=idx[idx.length-1];
+    const touchAfter=data.filter((c,i)=>i>lastBreak&&c.h>=lo&&c.l<=hi).length;
+    const dead=crossings>=1&&touchAfter===0, floating=crossings>CFG.maxCrossings;
+    const mirror=crossings>=1&&touchAfter>=1;
+    acc.push({lo,hi,mid,width:hi-lo,pivots:k.near.length,highs,lows,crossings,falseBreaks,
+      dead,floating,mirror,round:roundish(mid,step),
+      score:Math.min(k.near.length,6)*2+(mirror?2.5:0)+Math.min(falseBreaks,3)*0.8+(roundish(mid,step)?1:0)+lastPiv/Math.max(data.length-1,1)*2,
+      age:(data.length-1)-lastPiv});
+    if(acc.length>=CFG.maxLevels*2)break;
+  }
+  return acc.sort((a,b)=>b.score-a.score).slice(0,CFG.maxLevels).sort((a,b)=>a.mid-b.mid);
+}
+function trendOf(cs){const d=cs.slice(-120);if(d.length<40)return"н/д";
+  const p=pivotsOf(d),hi=p.filter(x=>x.type==="h").map(x=>x.p),lo=p.filter(x=>x.type==="l").map(x=>x.p);
+  if(hi.length<3||lo.length<3)return"боковик";
+  const up=a=>a.slice(1).filter((v,i)=>v>a[i]).length/(a.length-1);
+  const h=up(hi),l=up(lo);
+  return(h<0.4&&l<0.4)?"нисходящий":(h>0.6&&l>0.6)?"восходящий":"боковик"}
+function gapsOf(cs,atr){
+  const g={up:0,down:0},lim=atr*CFG.gapAtr;
+  cs.slice(-60).forEach((c,i,a)=>{if(!i)return;const d=c.o-a[i-1].c;
+    if(d>lim)g.up++;else if(d<-lim)g.down++});
+  return g;
+}
+function modelOf(hc,lv,atrH,short,luft,step,forming,raw){
+  const n=hc.length,last=hc[n-1],prev=hc[n-2],B=hc.slice(-6);
+  /* Сторона ПОДХОДА, а не текущая сторона цены. После пробоя last.c уже
+     за уровнем, и «short» переворачивается — из-за этого модели ложного
+     пробоя («закрытие за уровнем без импульса», сложный ЛП) не срабатывали
+     никогда: условие «закрылся за дальней кромкой» противоречило само себе. */
+  const pre=hc.slice(-8,-2);
+  const wasAbove=pre.filter(c=>c.c>lv.hi).length, wasBelow=pre.filter(c=>c.c<lv.lo).length;
+  const side0=wasBelow>wasAbove?true:wasAbove>wasBelow?false:short;   // true = подход снизу
+  const m={signals:[],forbid:null,approach:"нейтральный",charged:false,side0,streak:0,ext:null};
+  const add=(name,act,state)=>{m.signals.push({name,act,state});if(state==="заряжено")m.charged=true};
+  /* Вся геометрия — в координатах ПОДХОДА (side0): ближняя кромка,
+     поджатие, касания и направление отбоя. Прежний код мерил по «short» —
+     текущей стороне цены, которая после прокола переворачивается: поджатие
+     и отбой могли посчитаться с той стороны уровня, откуда никто не подходил. */
+  const nearE=side0?lv.lo:lv.hi;
+  const d=B.map(c=>side0?nearE-c.c:c.c-nearE);
+  const mono=d.slice(1).filter((v,i)=>v<d[i]).length;
+  /* Усечённые бары (первый час МосБиржи 06:50–07:00) занижают средний
+     размах и рисовали ложное поджатие — в размах их не берём. */
+  const rng=B.filter(c=>!c.partial).map(c=>c.h-c.l);
+  const r3=rng.slice(-3),avg3=r3.length?r3.reduce((a,b)=>a+b,0)/r3.length:atrH;
+  if(mono>=3&&avg3<atrH*0.75){m.approach="поджатие";m.forbid="поджатие: отбой не торгуем"}
+  else if(avg3>atrH*1.2)m.approach="крупные бары";
+  if(m.approach==="поджатие"){const away=side0?(last.c<=prev.c):(last.c>=prev.c);
+    if(away){m.forbid=null;m.approach="выравнивающий бар"}}
+  /* Отбой. По книге БПУ бьёт в уровень «копейка в копейку»: недобой — не
+     больше люфта, прокол дальней кромки запрещён (это уже другая модель).
+     Прежний допуск 12% ATR засчитывал за подтверждение бары, вообще не
+     дошедшие до уровня, — так UNAC получил «Отбой БСУ+БПУ1+БПУ2»
+     при разборе «ни одного признака у уровня» этажом выше. */
+  /* Условия отбоя из книги, буквально:
+     — БСУ: любой бар, остановившийся в цене уровня, С ЛЮБОЙ стороны —
+       БСУ и БПУ1 могут стоять по разные стороны уровня (условие 2);
+       прежний код искал БСУ только со стороны подхода и терял зеркальные;
+     — БПУ1 бьёт в цену уровня точно, люфт — только на валютном рынке (условие 1);
+     — БПУ2 может недобить на люфт, но не пробить (условие 5);
+     — БПУ1 и БПУ2 — по одну сторону: сторона подхода side0. */
+  const inZoneH=c=>c.h>=lv.lo&&c.h<=lv.hi, inZoneL=c=>c.l<=lv.hi&&c.l>=lv.lo;
+  const hitExact=c=>side0?inZoneH(c):inZoneL(c);                                   // БПУ1
+  const hit=c=>side0?(c.h>=lv.lo-luft&&c.h<=lv.hi):(c.l<=lv.hi+luft&&c.l>=lv.lo);   // БПУ2
+  const hitAny=c=>inZoneH(c)||inZoneL(c);                                            // БСУ
+  const pierced=hc.slice(-3).some(c=>side0?c.h>lv.hi:c.l<lv.lo)
+    ||(raw||[]).some(c=>side0?c.h>lv.hi:c.l<lv.lo);
+  if(hitExact(last)||(hit(last)&&hitExact(prev))){
+    let bsu=-1;for(let i=n-3;i>=0;i--)if(hitAny(hc[i])){bsu=i;break}
+    if(bsu<0)add("БСУ не найден",
+      "бар коснулся уровня, но раньше в эту цену никто не бил — по методике это ещё не уровень, а одиночная остановка","ждём");
+    if(bsu>=0){
+      if(hit(last)&&hitExact(prev)){
+        if((last.h-last.l)>=CFG.paraHi*atrH)add("БПУ2 паранормальный","модель отменяется","запрет");
+        else if(pierced)add("Отбой БСУ+БПУ1+БПУ2","уровень свежо прокалывался — любой пробой ломает модель отбоя","запрет");
+        else if(m.forbid)add("Отбой БСУ+БПУ1+БПУ2",m.forbid,"запрет");
+        else add("Отбой БСУ+БПУ1+БПУ2","лимитка у уровня","заряжено");
+      }else if(hitExact(last))add("Отбой БСУ+БПУ1","ждём БПУ2","ждём");
+    }
+  }
+  /* Ложный пробой одним баром: прокол и возврат внутри одного завершённого
+     бара. К моменту разбора модель уже отработала — вход был до закрытия. */
+  const depth=side0?(last.h-lv.hi):(lv.lo-last.l);
+  const backInside=side0?last.c<lv.lo:last.c>lv.hi;
+  if(depth>2*step&&backInside)
+    add("Ложный пробой одним баром",depth>atrH/3?"прокол глубже трети ATR":"модель отработала внутри часа","упущено");
+  /* Стрик закрытий за уровнем: пробойный бар и все последующие, закрывшиеся
+     в плоскости пробоя. Импульс по книге меряется у ПРОБОЙНОГО бара — прежний
+     код смотрел на последний бар и после импульсного пробоя с одним тихим
+     баром сверху заряжал контртрендовую заявку против истинного пробоя. */
+  const closedBeyond=c=>side0?c.c>lv.hi:c.c<lv.lo;
+  let streak=0;while(streak<n&&closedBeyond(hc[n-1-streak]))streak++;
+  m.streak=streak;
+  if(streak>0){
+    const seg=hc.slice(n-streak), bo=seg[0];
+    m.ext=side0?Math.max(...seg.map(c=>c.h)):Math.min(...seg.map(c=>c.l));
+    const kImp=(bo.h-bo.l)/atrH;
+    /* Книга: у сложного ЛП касания уровня хвостами допустимы, возврат за
+       уровень — нет. Хвост, прошедший обратную кромку, ломает консолидацию. */
+    const tailsOk=seg.slice(1).every(c=>side0?c.l>=lv.lo:c.h<=lv.hi);
+    /* Второй бар двухбарной модели обязан ОТКРЫТЬСЯ в плоскости пробоя.
+       Второй бар — это текущий, ещё не закрытый: проверяем его открытие. */
+    const openOk=!forming||(side0?forming.o>lv.hi:forming.o<lv.lo);
+    if(kImp>=CFG.impulseAtr)
+      add("Истинный пробой с импульсом",`уровень взят: пробойный бар ${kImp.toFixed(1)} часового ATR`,"упущено");
+    else if(streak>=4&&tailsOk)
+      add("Сложный ложный пробой",`${streak} баров в зоне пробоя — условная заявка с обратной стороны`,"заряжено");
+    else if(streak>=4)
+      add("Консолидация за уровнем нарушена","хвост вернулся за уровень — сложный ЛП не по правилам","ждём");
+    else if(openOk)
+      add("Закрытие за уровнем без импульса","условная заявка с обратной стороны","заряжено");
+    else
+      add("Закрытие за уровнем без импульса","новый бар открылся не в плоскости пробоя — модель двух баров не по книге","ждём");
+  }
+  /* Пробой торгуется только на поджатии и только ПОКА уровень цел:
+     если закрытие уже за уровнем, пробой случился без нас. */
+  if(m.approach==="поджатие"&&streak===0)add("Пробой на поджатии","стоп-заявка за уровень","заряжено");
+  const v20=hc.slice(-20).reduce((a,c)=>a+c.v,0)/20,v3=hc.slice(-3).reduce((a,c)=>a+c.v,0)/3;
+  m.vol=v20>0?v3/v20:null;
+  return m;
+}
+/* ==================== КОНЕЦ ДВИЖКА ==================== */
+
+/* ==================== данные MOEX ISS ==================== */
+const ISS="https://iss.moex.com/iss";
+const DATA={};           // sec -> {daily,hourly,meta}
+const META={};           // sec -> {name,lot,pstep,val}
+const MSK=3*3600e3;
+const dstr=t=>new Date(t+MSK).toISOString().slice(0,10);
+const mskStr=t=>new Date(t+MSK).toISOString().slice(0,16).replace("T"," ");
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function issJson(u){
+  const r=await fetch(u);
+  if(!r.ok)throw new Error(`ISS ответил ${r.status}`);
+  return r.json();
+}
+const tbl=b=>(b&&b.data)?b.data.map(row=>Object.fromEntries(row.map((v,i)=>[b.columns[i],v]))):[];
+async function issSecurities(){
+  const j=await issJson(`${ISS}/engines/stock/markets/shares/boards/TQBR/securities.json?iss.meta=off&iss.only=securities,marketdata`
+    +`&securities.columns=SECID,SHORTNAME,LOTSIZE,MINSTEP&marketdata.columns=SECID,VALTODAY`);
+  const val={};tbl(j.marketdata).forEach(r=>val[r.SECID]=+r.VALTODAY||0);
+  tbl(j.securities).forEach(r=>{META[r.SECID]={name:r.SHORTNAME,lot:+r.LOTSIZE||1,pstep:+r.MINSTEP||0.01,val:val[r.SECID]||0}});
+  return META;
+}
+async function issCandles(sec,interval,from,till,wait){
+  const out=[];let start=0;
+  for(let page=0;page<60;page++){
+    const j=await issJson(`${ISS}/engines/stock/markets/shares/boards/TQBR/securities/${sec}/candles.json?iss.meta=off`
+      +`&interval=${interval}&from=${from}&till=${till}&start=${start}`);
+    const rows=tbl(j.candles);
+    out.push(...rows);
+    if(rows.length<100)break;          // ISS отдаёт страницами; короткая страница — последняя
+    start+=rows.length;
+    if(wait)await sleep(wait);
+  }
+  return normBars(out,interval);
+}
+/* Бар в формате движка: o,h,l,c,v, дата d, час hh (МСК), время t.
+   Часовик 18:00 короткий (до 18:40) — усечённый, как у робота. */
+function normBars(rows,interval){
+  const seen=new Set(),out=[];
+  for(const r of rows){
+    const b=String(r.begin||"");if(b.length<10)continue;
+    const d=b.slice(0,10),hh=+b.slice(11,13)||0;
+    const t=Date.parse(b.replace(" ","T")+"+03:00");
+    const key=interval===24?d:b;
+    if(seen.has(key)||!isFinite(t))continue;seen.add(key);
+    const o=+r.open,h=+r.high,l=+r.low,c=+r.close;
+    if(![o,h,l,c].every(isFinite)||h<l)continue;
+    out.push({d,hh,t,o,h,l,c,v:+r.volume||0,val:+r.value||0,partial:interval===60&&hh===18,ts:b});
+  }
+  return out.sort((a,b)=>a.t-b.t);
+}
+/* ==================== данные Finam Trade API (реальное время) ==================== */
+/* Тот же путь, что у робота: обмен секрета на JWT, GET /v1/instruments/{sym}/bars. */
+const FAPI="https://api.finam.ru";
+let FJWT=null,FJWT_AT=0;
+const ftok=()=>{const el=document.getElementById("ftok");return el?el.value.trim():""};
+const V=x=>x==null?null:(typeof x==="object"?Number(x.value):Number(x));
+function findArray(o,d=0){
+  if(Array.isArray(o))return o;
+  if(!o||typeof o!=="object"||d>3)return null;
+  for(const k of Object.keys(o)){const v=findArray(o[k],d+1);if(v&&v.length)return v}
+  return null;
+}
+async function fauth(){
+  const r=await fetch(FAPI+"/v1/sessions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({secret:ftok()})});
+  const t=await r.text();
+  if(r.status!==200)throw new Error("Finam: обмен токена HTTP "+r.status+" — "+t.slice(0,120));
+  FJWT=JSON.parse(t).token;FJWT_AT=Date.now();
+  if(!FJWT)throw new Error("Finam: в ответе нет token");
+}
+async function freq(path,tries=0){
+  if(!FJWT||Date.now()-FJWT_AT>13*60e3)await fauth();
+  const r=await fetch(FAPI+path,{headers:{Accept:"application/json",Authorization:FJWT}});
+  if(r.status===401&&tries<2){FJWT=null;return freq(path,tries+1)}
+  if(r.status===429&&tries<3){await sleep(1500*(tries+1));return freq(path,tries+1)}
+  const t=await r.text();let j=null;try{j=JSON.parse(t)}catch(e){}
+  return{code:r.status,json:j,text:t};
+}
+function normFinam(j,interval){
+  const out=[];
+  for(const b of (findArray(j)||[])){
+    const ts=String(b.timestamp||b.time||""),t0=Date.parse(ts);if(!isFinite(t0))continue;
+    const o=V(b.open),h=V(b.high),l=V(b.low),c=V(b.close),v=V(b.volume)||0;
+    if(![o,h,l,c].every(isFinite)||h<l)continue;
+    const d=dstr(t0),hh=new Date(t0+MSK).getUTCHours();
+    out.push({d,hh,t:interval===24?Date.parse(d+"T00:00:00+03:00"):t0,o,h,l,c,v,val:v*c,partial:interval===60&&hh===18,ts});
+  }
+  return out;
+}
+async function finamCandles(sec,interval,from,till,wait){
+  const tf=interval===24?"TIME_FRAME_D":"TIME_FRAME_H1",sym=sec.includes("@")?sec:sec+"@MISX",chunk=interval===24?360:28;
+  let out=[],a=from;
+  while(a<=till){
+    const b=addDays(a,chunk-1)<till?addDays(a,chunk-1):till;
+    const r=await freq(`/v1/instruments/${encodeURIComponent(sym)}/bars?timeframe=${tf}&interval.start_time=${a}T00:00:00Z&interval.end_time=${b}T23:59:59Z`);
+    if(r.code!==200)throw new Error(`Finam ${sym}: HTTP ${r.code} ${(r.text||"").slice(0,100)}`);
+    out=out.concat(normFinam(r.json,interval));
+    a=addDays(b,1);if(wait)await sleep(wait);
+  }
+  const seen=new Set();
+  return out.filter(x=>{const k=interval===24?x.d:x.t;if(seen.has(k))return false;seen.add(k);return true}).sort((x,y)=>x.t-y.t);
+}
+const addDays=(iso,n)=>{const t=Date.parse(iso+"T00:00:00Z")+n*864e5;return new Date(t).toISOString().slice(0,10)};
+
+/* ==================== контекст дня (дневной этаж) ==================== */
+/* Всё, что зависит только от даты, считается один раз на день: закрытые
+   дневки, ATR, уровни, гэпы, оборот, тренд. Ширина зоны берётся от
+   расчётного стопа по цене открытия дня — за день она меняется на доли шага. */
+const DAYCTX={};
+function dayCtx(sec,d,pxRef){
+  const key=sec+"|"+d;
+  if(DAYCTX[key])return DAYCTX[key];
+  const daily=DATA[sec].daily;
+  let n=daily.length;while(n>0&&daily[n-1].d>=d)n--;
+  const dc=daily.slice(0,n);
+  const ctx={dc};
+  if(dc.length<CFG.minDailyBars){ctx.skip=`дневных баров ${dc.length}`;return DAYCTX[key]=ctx}
+  const last20=dc.slice(-20);
+  ctx.turn=last20.reduce((a,c)=>a+(c.val||c.v*c.c),0)/Math.max(1,last20.length);
+  const step=pxRef<10?0.001:0.01;
+  const aD=atrOf(dc,CFG.atrWinD,false);
+  if(!aD){ctx.skip="ATR не посчитан";return DAYCTX[key]=ctx}
+  ctx.aD=aD;ctx.step=step;
+  const cstopDay=Math.max(rstep(pxRef*0.2/100,step),step);
+  ctx.gp=gapsOf(dc,aD.atr);
+  ctx.lv=levelsOf(dc,pxRef,aD.atr,step,cstopDay);
+  ctx.live=ctx.lv.filter(z=>!z.dead&&!z.floating&&z.age<=CFG.maxLevelAgeD);
+  const hist=dc.slice(-CFG.lookbackD);
+  ctx.extLo=Math.min(...hist.map(c=>c.l));ctx.extHi=Math.max(...hist.map(c=>c.h));
+  ctx.trend=trendOf(dc);
+  return DAYCTX[key]=ctx;
+}
+const nearest=(live,px)=>live.reduce((p,c)=>Math.min(Math.abs(px-c.lo),Math.abs(px-c.hi))<Math.min(Math.abs(px-p.lo),Math.abs(px-p.hi))?c:p);
+
+/* Незакрытый дневной бар — из часовиков этого дня до бара i включительно. */
+function liveFromHourly(hourly,i){
+  const d=hourly[i].d;let o=null,h=-Infinity,l=Infinity,v=0;
+  for(let k=i;k>=0&&hourly[k].d===d;k--){o=hourly[k].o;h=Math.max(h,hourly[k].h);l=Math.min(l,hourly[k].l);v+=hourly[k].v}
+  return{d,o,h,l,c:hourly[i].c,v};
+}
+/* ==================== разбор внутри дня — порт decide() робота ==================== */
+const CORE_H=[10,11,12,13,14,15,16,17,18];      // часы основной сессии МосБиржи
+const CORE_START_H=10, CORE_END_MIN=18*60+40;    // 10:00–18:40 МСК
+const mskMin=t=>{const x=new Date(t+MSK);return x.getUTCHours()*60+x.getUTCMinutes()};
+
+function decideIntra(sec,i,P){
+  const hourly=DATA[sec].hourly, bar=hourly[i];
+  const ST={st:1};
+  const tDec=bar.t+3600e3+90e3;                  // решение через 90 с после закрытия бара, как у робота
+  const live=liveFromHourly(hourly,i);
+  const pxD=live.c;
+  const ctx=dayCtx(sec,bar.d,live.o??pxD);
+  if(ctx.skip)return{sec,skip:ctx.skip,st:1};
+  const{dc,aD,step,lv,live:liveLv,extLo,extHi,gp}=ctx;
+  if(ctx.turn<P.tmin)return{sec,skip:`оборот ${(ctx.turn/1e6).toFixed(0)} млн ₽ — ниже порога`,st:1};
+  const stopHi=Math.max(rstep(pxD*0.2/100,step),step), stopLo=Math.max(rstep(pxD*0.1/100,step),step);
+  if(stopLo/aD.atr*100>CFG.stopMaxPctAtrD)return{sec,skip:"ATR вмещает меньше пяти стопов",st:2};
+  const cstop=(stopHi/aD.atr*100>CFG.stopMaxPctAtrD)?stopLo:stopHi;
+  const luft=Math.max(rstep(cstop*CFG.luftPct/100,step),step);
+  if(gp.up>=4&&gp.down>=4&&gp.up+gp.down>=CFG.maxGaps)return{sec,skip:`${gp.up+gp.down} разрывов больше ATR — график рваный`,st:2};
+  if(!liveLv.length)return{sec,skip:"живых уровней нет",st:3};
+  if(liveLv.some(z=>pxD>=z.lo&&pxD<=z.hi))return{sec,skip:"цена внутри зоны уровня",st:3};
+  const nearD=nearest(liveLv,pxD);
+  const shortD=pxD<nearD.lo, edgeD=shortD?nearD.lo:nearD.hi, dD=Math.abs(pxD-edgeD)/aD.atr;
+  if(dD>CFG.nearAtrD*2)return{sec,skip:`до уровня ${dD.toFixed(2)} ATR`,st:3};
+  const i0=liveLv.indexOf(nearD);
+  const below=i0>0?liveLv[i0-1]:null, above=i0+1<liveLv.length?liveLv[i0+1]:null;
+  const nx=(shortD?below:above)||{mid:shortD?extLo:extHi,noLevel:true};
+  if(Math.abs(edgeD-nx.mid)<aD.atr)return{sec,skip:"технический ATR меньше расчётного",st:4,
+    why:`от кромки ${fmt(edgeD)} до следующего уровня ${fmt(nx.mid)} = ${fmt(Math.abs(edgeD-nx.mid))} при дневном ATR ${fmt(aD.atr)}`};
+  if(Math.abs(edgeD-nx.mid)/cstop<CFG.stopsToTarget)return{sec,skip:`до цели ${(Math.abs(edgeD-nx.mid)/cstop).toFixed(1)} стопов`,st:4};
+
+  /* фаза 2: часовик основной сессии, память о проколах по всем сессиям */
+  const mm=mskMin(tDec);
+  if(!(bar.hh>=CORE_START_H&&bar.hh<=17))return{sec,skip:"не основная сессия",st:5};
+  if(CORE_END_MIN-mm<40)return{sec,skip:"до конца основной сессии меньше 40 минут — внутри дня не входим",st:5};
+  const doneAll=hourly.slice(0,i+1);
+  const rawDone=doneAll.slice(-CFG.depthH*24);
+  let hc=doneAll.filter(b=>CORE_H.includes(b.hh)&&b.t>=bar.t-CFG.depthH*864e5);
+  if(hc.length<CFG.minHourBars)return{sec,skip:`часовых баров ${hc.length}`,st:5};
+  const px=hc[hc.length-1].c;
+  const bpd=hc.length/Math.max(1,new Set(hc.map(b=>b.d)).size);
+  const aH=atrOf(hc,clamp(Math.round(bpd*3),12,60),false);
+  if(!aH)return{sec,skip:"часовой ATR не посчитан",st:5};
+  const near=nearest(liveLv,px);
+  const short=px<near.lo, edge=short?near.lo:near.hi, dA=Math.abs(px-edge)/aD.atr;
+  const lastH=hc[hc.length-1];
+  if(dA>CFG.nearAtrD&&!(lastH.h>=near.lo-luft&&lastH.l<=near.hi+luft))return{sec,skip:`до уровня ${dA.toFixed(2)} ATR`,st:5};
+  const nb=hourly[i+1];
+  const forming=(nb&&nb.t===bar.t+3600e3)?{o:nb.o}:null;          // открытие следующего бара уже известно
+  const rawRecent=rawDone.filter(b=>b.t+3600e3>=tDec-5*3600e3);
+  const mo=modelOf(hc,near,aH.atr,short,luft,step,forming,rawRecent);
+  const sg=mo.signals.length?mo.signals.map(x=>`${x.name} — ${x.state}`+((x.state==="запрет"||x.state==="заряжено")&&x.act?` (${x.act})`:"")).join("; "):"ни одного признака у уровня";
+  const base={sec,near,mo,dA,aH:aH.atr,aD:aD.atr,live:liveLv,px,idx:i,tDec};
+  if(!mo.charged)return{...base,skip:mo.forbid||"модель не заряжена",st:6,why:`подход: ${mo.approach}; ${sg}`+(mo.vol?`; объём ${mo.vol.toFixed(2)}×`:"")};
+  const primary=mo.signals.find(s=>s.state==="заряжено");
+  const isBreak=/Пробой на поджатии/i.test(primary.name), isFB=/ложн|Закрытие за уровнем/i.test(primary.name);
+  const dirPlan=isBreak?!mo.side0:mo.side0, trendD=ctx.trend;
+  const counter=(dirPlan&&trendD==="восходящий")||(!dirPlan&&trendD==="нисходящий");
+  const cstopE=(CFG.counterTrendTight&&counter)?stopLo:cstop;
+  const luftE=Math.max(rstep(cstopE*CFG.luftPct/100,step),step);
+  let dirShort=mo.side0,plan,entry,stop;
+  if(isBreak){plan="пробой";dirShort=!mo.side0;
+    entry=rstep(dirShort?near.lo-luftE:near.hi+luftE,step);
+    stop=rstep(dirShort?near.hi+2*step:near.lo-2*step,step)}
+  else if(isFB){plan="ложный пробой";dirShort=mo.side0;
+    const eEdge=mo.side0?near.lo:near.hi;
+    entry=rstep(mo.side0?eEdge-2*step:eEdge+2*step,step);
+    const tail=mo.side0?Math.max(near.hi,mo.ext??near.hi):Math.min(near.lo,mo.ext??near.lo);
+    stop=rstep(mo.side0?tail+2*step:tail-2*step,step)}
+  else{plan="отбой";
+    const eEdge=mo.side0?near.lo:near.hi;
+    entry=rstep(mo.side0?eEdge-luftE:eEdge+luftE,step);
+    stop=rstep(mo.side0?near.hi+2*step:near.lo-2*step,step)}
+  const pc=dc[dc.length-1].c;
+  const used=(Math.max(live.h,pc)-Math.min(live.l,pc))/aD.atr*100;
+  const dayDir=live.c>=pc?1:-1, along=(dayDir>0&&!dirShort)||(dayDir<0&&dirShort);
+  if(used>CFG.dayUsedMax&&along)return{...base,skip:`день прошёл ${used.toFixed(0)}% ATR в сторону сделки`,st:6,plan};
+  if(plan==="отбой"&&mm-CORE_START_H*60<60)return{...base,skip:"первый час торгов — отбой не торгуем",st:6,plan};
+  const pq=(META[sec]&&META[sec].pstep)||step;
+  entry=qdir(entry,pq,dirShort);stop=qdir(stop,pq,!dirShort);
+  let R=Math.max(Math.abs(stop-entry),pq);
+  const floorR=Math.max(cstopE*0.6,2*step);
+  if(R<floorR){stop=qdir(dirShort?entry+floorR:entry-floorR,pq,!dirShort);R=Math.abs(stop-entry)}
+  let slip=0;
+  if(plan!=="отбой"){slip=Math.max(2*pq,rstep(0.2*R,pq));R+=slip;stop=qdir(dirShort?entry+R:entry-R,pq,!dirShort);R=Math.abs(stop-entry)}
+  if(R/cstopE>(isFB?CFG.capTech+0.1:CFG.capTech))
+    return{...base,skip:`технический стоп ${(R/cstopE*100).toFixed(0)}% расчётного${counter?" (контртренд: расчётный 0,1%)":""}`,st:6,plan};
+  const iN=liveLv.indexOf(near);
+  const belowN=iN>0?liveLv[iN-1]:null, aboveN=iN+1<liveLv.length?liveLv[iN+1]:null;
+  const tgtObj=dirShort?(belowN||{mid:extLo,noLevel:true}):(aboveN||{mid:extHi,noLevel:true});
+  const tgt=tgtObj.mid, run=Math.abs(tgt-entry), rr=run/R;
+  if(run<aD.atr)return{...base,skip:"технический ATR меньше расчётного",st:6,plan};
+  if(rr<CFG.stopsToTarget)return{...base,skip:`до цели ${rr.toFixed(1)} стопов при требуемых ${CFG.stopsToTarget}`,st:6,plan};
+  const tp=qdir(dirShort?entry-CFG.minRR*R:entry+CFG.minRR*R,pq,dirShort);
+  return{...base,ok:true,kind:"intra",plan,signal:primary.name,dirShort,entry,stop,tp,R,slip,rr,tgt,counter,trend:trendD,
+    level:`${fmt(near.lo)}–${fmt(near.hi)}`,pq};
+}
+
+/* ==================== свинговый разбор — порт decideSwing() ==================== */
+/* Решение после закрытия дня k; заявка живёт день k+1 (открытие уже известно). */
+function decideSwing(sec,k,P){
+  const daily=DATA[sec].daily, dc=daily.slice(0,k+1), nb=daily[k+1];
+  if(dc.length<CFG.minDailyBars)return{sec,skip:`дневных баров ${dc.length}`,st:1};
+  const last20=dc.slice(-20), turn=last20.reduce((a,c)=>a+(c.val||c.v*c.c),0)/Math.max(1,last20.length);
+  if(turn<P.tmin)return{sec,skip:`оборот ${(turn/1e6).toFixed(0)} млн ₽ — ниже порога`,st:1};
+  const px=dc[dc.length-1].c, step=px<10?0.001:0.01;
+  const aD=atrOf(dc,CFG.atrWinD,false);
+  if(!aD)return{sec,skip:"ATR не посчитан",st:2};
+  const atrPct=aD.atr/px*100;
+  if(atrPct<0.7)return{sec,skip:`ATR ${atrPct.toFixed(1)}% цены — бумага стоит`,st:2};
+  const cstopRef=Math.max(rstep(px*0.2/100,step),step);
+  const lv=levelsOf(dc,px,aD.atr,step,cstopRef);
+  const liveLv=lv.filter(z=>!z.dead&&!z.floating&&z.age<=CFG.maxLevelAgeD);
+  if(!liveLv.length)return{sec,skip:"живых уровней нет",st:3};
+  if(liveLv.some(z=>px>=z.lo&&px<=z.hi))return{sec,skip:"цена внутри зоны уровня",st:3};
+  const near=nearest(liveLv,px);
+  const short=px<near.lo, edge=short?near.lo:near.hi, dA=Math.abs(px-edge)/aD.atr;
+  const lastD=dc[dc.length-1];
+  if(dA>CFG.nearAtrD&&!(lastD.h>=near.lo&&lastD.l<=near.hi))return{sec,skip:`до уровня ${dA.toFixed(2)} ATR`,st:3};
+  const liveBar=nb?{d:nb.d,o:nb.o,h:nb.o,l:nb.o,c:nb.o}:null;   // сегодняшний бар: известно только открытие
+  const luft=Math.max(rstep(aD.atr*0.03,step),step);
+  const mo=modelOf(dc,near,aD.atr,short,luft,step,liveBar);
+  const sg=mo.signals.length?mo.signals.map(x=>`${x.name} — ${x.state}`+((x.state==="запрет"||x.state==="заряжено")&&x.act?` (${x.act})`:"")).join("; "):"ни одного признака у уровня";
+  const base={sec,near,mo,dA,aD:aD.atr,live:liveLv,px,idx:k,tDec:dc[dc.length-1].t+864e5};
+  if(!mo.charged)return{...base,skip:mo.forbid||"дневная модель не заряжена",st:6,why:`подход: ${mo.approach}; ${sg}`};
+  const i0=liveLv.indexOf(near), below=i0>0?liveLv[i0-1]:null, above=i0+1<liveLv.length?liveLv[i0+1]:null;
+  const hist=dc.slice(-CFG.lookbackD), extLo=Math.min(...hist.map(c=>c.l)), extHi=Math.max(...hist.map(c=>c.h));
+  const primary=mo.signals.find(s=>s.state==="заряжено");
+  const isBreak=/Пробой на поджатии/i.test(primary.name), isFB=/ложн|Закрытие за уровнем/i.test(primary.name);
+  let dirShort=mo.side0,plan,entry,stop;
+  const buf=Math.max(2*step,aD.atr*0.08);
+  if(isBreak){plan="пробой (дневной)";dirShort=!mo.side0;
+    stop=rstep(dirShort?near.hi+buf:near.lo-buf,step);entry=rstep(dirShort?near.lo-luft:near.hi+luft,step)}
+  else if(isFB){plan="ложный пробой (дневной)";dirShort=mo.side0;
+    const eEdge=mo.side0?near.lo:near.hi;entry=rstep(mo.side0?eEdge-2*step:eEdge+2*step,step);
+    const tail=mo.side0?Math.max(near.hi,mo.ext??near.hi):Math.min(near.lo,mo.ext??near.lo);
+    stop=rstep(mo.side0?tail+buf:tail-buf,step)}
+  else{plan="отбой (дневной)";const eEdge=mo.side0?near.lo:near.hi;
+    stop=rstep(mo.side0?near.hi+buf:near.lo-buf,step);entry=rstep(mo.side0?eEdge-luft:eEdge+luft,step)}
+  if(liveBar){
+    const used=(Math.max(liveBar.h,px)-Math.min(liveBar.l,px))/aD.atr*100, dayDir=liveBar.c>=px?1:-1;
+    const along=(dayDir>0&&!dirShort)||(dayDir<0&&dirShort);
+    if(used>CFG.dayUsedMax&&along)return{...base,skip:`день прошёл ${used.toFixed(0)}% ATR в сторону сделки`,st:6,plan};
+  }
+  /* Дневной отбой от дневного уровня — книжное исключение из правила первого часа:
+     заявка ставится с открытия. У робота здесь стоял блок первого часа, из-за
+     которого дневной отбой не торговался никогда — см. отчёт. */
+  const pq=(META[sec]&&META[sec].pstep)||step;
+  entry=qdir(entry,pq,dirShort);stop=qdir(stop,pq,!dirShort);
+  let R=Math.max(Math.abs(stop-entry),pq);
+  const floorR=aD.atr*SW.minRAtr;
+  if(R<floorR){stop=qdir(dirShort?entry+floorR:entry-floorR,pq,!dirShort);R=Math.abs(stop-entry)}
+  let slip=0;
+  if(plan.indexOf("отбой")!==0){slip=Math.max(2*pq,rstep(0.2*R,pq));R+=slip;stop=qdir(dirShort?entry+R:entry-R,pq,!dirShort);R=Math.abs(stop-entry)}
+  const capA=isFB?SW.fbRAtr:SW.maxRAtr;
+  if(R/aD.atr>capA)return{...base,skip:`стоп ${(R/aD.atr*100).toFixed(0)}% ATR при лимите ${Math.round(capA*100)}% — уровень рыхлый`,st:6,plan};
+  const tgtObj=dirShort?(below||{mid:extLo,noLevel:true}):(above||{mid:extHi,noLevel:true});
+  const tgt=tgtObj.mid, run=Math.abs(tgt-entry), rr=run/R;
+  if(run<aD.atr)return{...base,skip:"технический ATR меньше расчётного",st:6,plan};
+  if(rr<CFG.stopsToTarget)return{...base,skip:`до цели ${rr.toFixed(1)} стопов при требуемых ${CFG.stopsToTarget}`,st:6,plan};
+  const tp=qdir(dirShort?entry-CFG.minRR*R:entry+CFG.minRR*R,pq,dirShort);
+  const trend=trendOf(dc);
+  return{...base,ok:true,kind:"swing",plan,signal:primary.name,dirShort,entry,stop,tp,R,slip,rr,tgt,trend,
+    counter:(dirShort&&trend==="восходящий")||(!dirShort&&trend==="нисходящий"),level:`${fmt(near.lo)}–${fmt(near.hi)}`,pq};
+}
+/* ==================== симуляция исполнения ==================== */
+/* Пессимистичный порядок событий внутри бара: если бар дошёл и до входа,
+   и до стопа — считаем стоп. Гэп через стоп или тейк исполняется по открытию. */
+function exitOnBar(pos,bar){
+  const s=pos.dirShort;
+  const hitStop=s?bar.h>=pos.stop:bar.l<=pos.stop;
+  const hitTp=s?bar.l<=pos.tp:bar.h>=pos.tp;
+  if(hitStop){const gap=s?bar.o>=pos.stop:bar.o<=pos.stop;return{px:gap?bar.o:pos.stop,reason:"стоп"}}
+  if(hitTp){const gap=s?bar.o<=pos.tp:bar.o>=pos.tp;return{px:gap?bar.o:pos.tp,reason:"тейк"}}
+  return null;
+}
+function fillOnBar(ord,bar){
+  const s=ord.dirShort;
+  if(ord.plan.indexOf("отбой")===0){                     // лимитка у уровня
+    const touch=s?bar.h>=ord.entry:bar.l<=ord.entry;
+    if(!touch)return null;
+    const better=s?bar.o>=ord.entry:bar.o<=ord.entry;   // открылись за лимиткой — исполнение по открытию, лучше
+    return better?bar.o:ord.entry;
+  }
+  const trig=s?bar.l<=ord.entry:bar.h>=ord.entry;       // условная заявка
+  if(!trig)return null;
+  const worst=s?ord.entry-ord.slip:ord.entry+ord.slip;
+  const gap=s?bar.o<=ord.entry:bar.o>=ord.entry;
+  return gap?(s?Math.min(bar.o,worst):Math.max(bar.o,worst)):worst;
+}
+function rOf(pos,exitPx){const d=pos.dirShort?pos.fill-exitPx:exitPx-pos.fill;return d/pos.R}
+function closeTrade(pos,exitPx,reason,tExit,P,out){
+  const gross=rOf(pos,exitPx);
+  const commR=2*P.comm/100*pos.fill/pos.R;
+  out.push({...pos,exit:exitPx,reason,tExit,gross,commR,net:gross-commR});
+}
+
+function simIntra(sec,P,fromT,tillT,out){
+  const H=DATA[sec].hourly;let ord=null,pos=null;
+  for(let j=0;j<H.length;j++){
+    const bar=H[j];if(bar.t<fromT-CFG.depthH*864e5)continue;if(bar.t>tillT)break;
+    const core=CORE_H.includes(bar.hh);
+    if(pos){
+      let ex=core?exitOnBar(pos,bar):null;
+      if(!ex&&core&&bar.hh===18)ex={px:bar.c,reason:"конец сессии"};
+      if(!ex&&!core&&bar.d!==pos.day)ex={px:bar.o,reason:"перенос через ночь (не должно случаться)"};
+      if(ex){closeTrade(pos,ex.px,ex.reason,bar.t,P,out);pos=null}
+    }
+    if(ord&&!pos){
+      if(bar.d!==ord.day||bar.hh>17||!core){ord=null}
+      else{
+        const broken=ord.dirShort?bar.h>=ord.stop:bar.l<=ord.stop;
+        const fill=fillOnBar(ord,bar);
+        if(fill!=null){
+          pos={...ord,fill,tFill:bar.t};ord=null;
+          if(broken){closeTrade(pos,pos.stop,"стоп (в баре входа)",bar.t,P,out);pos=null}
+          else{const hitTp=pos.dirShort?bar.l<=pos.tp:bar.h>=pos.tp;
+            if(hitTp){closeTrade(pos,pos.tp,"тейк",bar.t,P,out);pos=null}}
+        }else if(broken)ord=null;
+        else if(Math.abs(bar.c-ord.entry)>=2*ord.R)ord=null;
+      }
+    }
+    if(!ord&&!pos&&bar.t>=fromT&&bar.hh>=10&&bar.hh<=16){
+      const d=decideIntra(sec,j,P);
+      if(d.ok)ord={...d,day:bar.d,tPlaced:bar.t+3600e3};
+    }
+  }
+  if(pos){closeTrade(pos,H[H.length-1].c,"конец данных",H[H.length-1].t,P,out)}
+}
+
+function simSwing(sec,P,fromT,tillT,out){
+  const D=DATA[sec].daily;let ord=null,pos=null;
+  for(let k=0;k<D.length;k++){
+    const bar=D[k];if(bar.t>tillT)break;
+    if(pos){
+      let ex=exitOnBar(pos,bar);
+      if(!ex&&bar.t-pos.tFill>=7*864e5)ex={px:bar.c,reason:"семь календарных дней"};
+      if(ex){closeTrade(pos,ex.px,ex.reason,bar.t,P,out);pos=null}
+    }
+    if(ord&&!pos){
+      if(bar.t!==ord.tDay)ord=null;
+      else{
+        const broken=ord.dirShort?bar.h>=ord.stop:bar.l<=ord.stop;
+        const fill=fillOnBar(ord,bar);
+        if(fill!=null){pos={...ord,fill,tFill:bar.t};ord=null;
+          if(broken){closeTrade(pos,pos.stop,"стоп (в день входа)",bar.t,P,out);pos=null}
+          else{const hitTp=pos.dirShort?bar.l<=pos.tp:bar.h>=pos.tp;
+            if(hitTp){closeTrade(pos,pos.tp,"тейк",bar.t,P,out);pos=null}}
+        }else ord=null;   // дневная заявка живёт один день
+      }
+    }
+    if(!ord&&!pos&&bar.t>=fromT&&D[k+1]){
+      const d=decideSwing(sec,k,P);
+      if(d.ok)ord={...d,day:D[k+1].d,tDay:D[k+1].t,tPlaced:D[k+1].t};
+    }
+  }
+  if(pos){closeTrade(pos,D[D.length-1].c,"конец данных",D[D.length-1].t,P,out)}
+}
+
+/* Портфельный проход: правила робота поверх сырых сделок — не больше npos
+   одновременно, три стопа подряд заканчивают день, одна заявка на бумагу. */
+function portfolioPass(trades,P){
+  const t=[...trades].sort((a,b)=>a.tFill-b.tFill);
+  const open=[],kept=[];let day=null,streak=0,halted=false;
+  for(const tr of t){
+    const d=dstr(tr.tFill);
+    if(d!==day){day=d;streak=0;halted=false}
+    for(let i=open.length-1;i>=0;i--)if(open[i].tExit<=tr.tFill)open.splice(i,1);
+    if(halted||open.length>=P.npos)continue;
+    kept.push(tr);open.push(tr);
+    if(tr.net<0&&/стоп/.test(tr.reason)){streak++;if(streak>=3)halted=true}else if(tr.net>0)streak=0;
+  }
+  return kept;
+}
+function stats(trades){
+  const n=trades.length;if(!n)return null;
+  const wins=trades.filter(x=>x.net>0).length;
+  const sum=k=>trades.reduce((a,x)=>a+x[k],0);
+  const gp=trades.filter(x=>x.net>0).reduce((a,x)=>a+x.net,0), gl=-trades.filter(x=>x.net<=0).reduce((a,x)=>a+x.net,0);
+  let eq=0,peak=0,dd=0,maxLose=0,cur=0;
+  const curve=[...trades].sort((a,b)=>a.tExit-b.tExit).map(x=>{eq+=x.net;peak=Math.max(peak,eq);dd=Math.max(dd,peak-eq);
+    if(x.net<0){cur++;maxLose=Math.max(maxLose,cur)}else cur=0;return{t:x.tExit,eq}});
+  return{n,wins,winPct:wins/n*100,gross:sum("gross"),net:sum("net"),avgGross:sum("gross")/n,avgNet:sum("net")/n,
+    pf:gl>0?gp/gl:Infinity,dd,maxLose,curve,comm:sum("commR")};
+}
+const byPlan=trades=>{const m={};trades.forEach(x=>{const k=x.plan.replace(" (дневной)","");(m[k]=m[k]||[]).push(x)});return Object.entries(m).map(([k,v])=>[k,stats(v)])};
+/* ==================== график ==================== */
+const CH={sec:null,series:[],kind:"intra",focus:null,zones:[],plan:null,trades:[],touch:[],n:120,off:0,drag:null};
+function setChart(sec,kind,focusT,zones,plan,trades,touch){
+  CH.sec=sec;CH.kind=kind;CH.series=kind==="intra"?DATA[sec].hourly.filter(b=>CORE_H.includes(b.hh)):DATA[sec].daily;
+  CH.zones=zones||[];CH.plan=plan||null;CH.trades=trades||[];CH.touch=touch||[];
+  let fi=CH.series.findIndex(b=>b.t>=focusT);if(fi<0)fi=CH.series.length-1;
+  CH.n=kind==="intra"?120:140;CH.off=Math.max(0,Math.min(CH.series.length-CH.n,fi-Math.round(CH.n*0.7)));
+  drawChart();
+}
+function drawChart(){
+  const cv=document.getElementById("chart");if(!cv)return;
+  const W=cv.clientWidth||900,Hh=cv.clientHeight||440;
+  const dpr=window.devicePixelRatio||1;cv.width=W*dpr;cv.height=Hh*dpr;
+  const g=cv.getContext("2d");g.setTransform(dpr,0,0,dpr,0,0);
+  g.fillStyle="#10151d";g.fillRect(0,0,W,Hh);
+  const S=CH.series;if(!S.length){g.fillStyle="#5d6778";g.font="13px Segoe UI, sans-serif";g.fillText("Нет данных для графика",16,24);return}
+  const a=Math.max(0,CH.off),b=Math.min(S.length,a+CH.n),bars=S.slice(a,b);if(!bars.length)return;
+  const padL=8,padR=64,padT=10,padB=26,plotW=W-padL-padR,plotH=Hh-padT-padB-48;
+  let lo=Math.min(...bars.map(x=>x.l)),hi=Math.max(...bars.map(x=>x.h));
+  CH.zones.forEach(z=>{lo=Math.min(lo,z.lo);hi=Math.max(hi,z.hi)});
+  if(CH.plan){lo=Math.min(lo,CH.plan.stop,CH.plan.tp);hi=Math.max(hi,CH.plan.stop,CH.plan.tp)}
+  const pad=(hi-lo)*0.06||1;lo-=pad;hi+=pad;
+  const y=p=>padT+(hi-p)/(hi-lo)*plotH, xw=plotW/bars.length, x=i=>padL+i*xw+xw/2;
+  // зоны уровней
+  CH.zones.forEach(z=>{g.fillStyle="rgba(224,165,74,.16)";g.fillRect(padL,y(z.hi),plotW,Math.max(1,y(z.lo)-y(z.hi)));
+    g.strokeStyle="rgba(224,165,74,.55)";g.setLineDash([]);g.beginPath();g.moveTo(padL,y(z.hi));g.lineTo(padL+plotW,y(z.hi));g.moveTo(padL,y(z.lo));g.lineTo(padL+plotW,y(z.lo));g.stroke();
+    g.fillStyle="#e0a54a";g.font="11px Segoe UI, sans-serif";g.fillText(`${fmt(z.lo)}–${fmt(z.hi)} · ${z.pivots} касаний${z.mirror?" · зеркальный":""}`,padL+4,y(z.hi)-3)});
+  // разделители дней
+  g.strokeStyle="#1e2634";g.setLineDash([]);
+  bars.forEach((c,i)=>{if(i&&c.d!==bars[i-1].d){g.beginPath();g.moveTo(padL+i*xw,padT);g.lineTo(padL+i*xw,padT+plotH+48);g.stroke()}});
+  // объём
+  const vmax=Math.max(...bars.map(c=>c.v))||1;
+  bars.forEach((c,i)=>{g.fillStyle="#1f2a3a";const vh=c.v/vmax*44;g.fillRect(padL+i*xw+1,padT+plotH+48-vh,Math.max(1,xw-2),vh)});
+  // свечи
+  bars.forEach((c,i)=>{const up=c.c>=c.o;g.strokeStyle=g.fillStyle=up?"#4fb08c":"#d96b7a";
+    g.beginPath();g.moveTo(x(i),y(c.h));g.lineTo(x(i),y(c.l));g.stroke();
+    const t=y(Math.max(c.o,c.c)),bh=Math.max(1,Math.abs(y(c.o)-y(c.c)));g.fillRect(padL+i*xw+1,t,Math.max(1,xw-2),bh)});
+  // касания уровня
+  CH.touch.forEach(k=>{const i=k-a;if(i<0||i>=bars.length)return;g.fillStyle="#5b8def";g.beginPath();g.arc(x(i),y(bars[i].h)-6,3,0,7);g.fill()});
+  // сделки
+  CH.trades.forEach(tr=>{const i1=S.findIndex(c=>c.t>=tr.tFill)-a,i2=S.findIndex(c=>c.t>=tr.tExit)-a;
+    const col=tr.net>0?"#4fb08c":"#d96b7a";
+    if(i1>=0&&i1<bars.length){g.fillStyle=col;g.beginPath();const yy=y(tr.fill);
+      if(tr.dirShort){g.moveTo(x(i1),yy+3);g.lineTo(x(i1)-5,yy-6);g.lineTo(x(i1)+5,yy-6)}else{g.moveTo(x(i1),yy-3);g.lineTo(x(i1)-5,yy+6);g.lineTo(x(i1)+5,yy+6)}g.fill()}
+    if(i1>=0&&i2>=0&&i2<bars.length){g.strokeStyle=col;g.setLineDash([3,3]);g.beginPath();g.moveTo(x(Math.max(0,i1)),y(tr.fill));g.lineTo(x(i2),y(tr.exit));g.stroke();g.setLineDash([]);
+      g.fillStyle=col;g.font="11px Segoe UI, sans-serif";g.fillText(`${tr.net>=0?"+":""}${tr.net.toFixed(2)}R`,x(i2)+4,y(tr.exit)-2)}});
+  // лестница плана
+  if(CH.plan){const p=CH.plan;const lines=[[p.stop,"стоп","#d96b7a"],[p.entry,"вход","#f1f3f6"],[p.tp,"тейк 3R","#4fb08c"]];
+    lines.forEach(([v,lab,col])=>{g.strokeStyle=col;g.setLineDash([6,4]);g.beginPath();g.moveTo(padL,y(v));g.lineTo(padL+plotW,y(v));g.stroke();
+      g.setLineDash([]);g.fillStyle=col;g.font="11px Segoe UI, sans-serif";g.fillText(`${lab} ${fmt(v)}`,padL+plotW-150,y(v)-3)})}
+  // оси
+  g.fillStyle="#8d97a7";g.font="11px Segoe UI, sans-serif";
+  for(let k=0;k<=6;k++){const p=lo+(hi-lo)*k/6;g.fillText(fmt(p),padL+plotW+6,y(p)+4)}
+  const stepL=Math.max(1,Math.round(bars.length/8));
+  bars.forEach((c,i)=>{if(i%stepL===0){g.fillText(CH.kind==="intra"?mskStr(c.t).slice(5):c.d.slice(2),padL+i*xw,Hh-8)}});
+  g.fillStyle="#5d6778";g.fillText(`${CH.sec} · ${CH.kind==="intra"?"часовики основной сессии":"дневки"}`,padL+4,Hh-8-0+0);
+}
+function chartEvents(){
+  const cv=document.getElementById("chart");
+  cv.addEventListener("wheel",e=>{e.preventDefault();const k=e.deltaY>0?1.2:0.85;CH.n=Math.max(30,Math.min(600,Math.round(CH.n*k)));CH.off=Math.max(0,Math.min(CH.series.length-CH.n,CH.off));drawChart()},{passive:false});
+  cv.addEventListener("mousedown",e=>{CH.drag={x:e.clientX,off:CH.off};cv.style.cursor="grabbing"});
+  window.addEventListener("mousemove",e=>{if(!CH.drag)return;const W=cv.clientWidth||900;const db=Math.round((CH.drag.x-e.clientX)/(W/CH.n));CH.off=Math.max(0,Math.min(CH.series.length-CH.n,CH.drag.off+db));drawChart()});
+  window.addEventListener("mouseup",()=>{CH.drag=null;cv.style.cursor="grab"});
+  /* Телефон: один палец — сдвиг, два пальца — масштаб. */
+  let pinch=null;
+  cv.addEventListener("touchstart",e=>{if(e.touches.length===1){CH.drag={x:e.touches[0].clientX,off:CH.off};pinch=null}
+    else if(e.touches.length===2){pinch={d:Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY),n:CH.n};CH.drag=null}},{passive:true});
+  cv.addEventListener("touchmove",e=>{e.preventDefault();const W=cv.clientWidth||900;
+    if(e.touches.length===1&&CH.drag){const db=Math.round((CH.drag.x-e.touches[0].clientX)/(W/CH.n));CH.off=Math.max(0,Math.min(CH.series.length-CH.n,CH.drag.off+db));drawChart()}
+    else if(e.touches.length===2&&pinch){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+      CH.n=Math.max(30,Math.min(600,Math.round(pinch.n*pinch.d/Math.max(20,d))));CH.off=Math.max(0,Math.min(CH.series.length-CH.n,CH.off));drawChart()}},{passive:false});
+  cv.addEventListener("touchend",()=>{CH.drag=null;pinch=null},{passive:true});
+  window.addEventListener("resize",drawChart);
+}
+/* Касания зоны для подсветки: бары, чей хай или лоу остановился в зоне. */
+const touchesOf=(series,z,a,b)=>{const out=[];for(let i=Math.max(0,a);i<Math.min(series.length,b);i++){const c=series[i];if((c.h>=z.lo&&c.h<=z.hi)||(c.l<=z.hi&&c.l>=z.lo))out.push(i)}return out};
+/* ==================== интерфейс ==================== */
+let TRADES=[],PORT=[],SCREEN=[],LOADED=[];
+const $=id=>document.getElementById(id);
+function readP(){return{tmin:(+$("tmin").value||100)*1e6,comm:+$("comm").value||0,npos:Math.max(1,+$("npos").value||2),wait:+$("wait").value||0,
+  horizon:$("horizon").value,from:$("from").value,till:$("till").value}}
+const tickers=()=>$("tickers").value.split(/[\s,;]+/).map(s=>s.trim().toUpperCase()).filter(Boolean);
+function setProgress(t,cls){const e=$("progress");e.textContent=t;e.className=cls||""}
+function esc(s){return String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]))}
+
+async function loadAll(){
+  const P=readP(),list=tickers();
+  if(!list.length){setProgress("Список бумаг пуст.","warn");return}
+  if(!P.from||!P.till){setProgress("Укажи период.","warn");return}
+  $("btnLoad").disabled=true;
+  const useF=!!ftok();
+  try{
+    if(useF){setProgress("Проверяю токен Finam…");await fauth()}
+    setProgress("Справочник бумаг с биржи…");
+    let haveList=false;
+    try{await issSecurities();haveList=true}catch(e){if(!useF)throw e}
+    const dFrom=addDays(P.from,-460), hFrom=addDays(P.from,-45);
+    const src=useF?"Finam":"ISS";
+    LOADED=[];
+    for(let i=0;i<list.length;i++){
+      const sec=list[i];
+      if(haveList&&!META[sec]){setProgress(`${sec}: нет на TQBR, пропускаю`,"warn");await sleep(300);continue}
+      setProgress(`${src}: загружаю ${sec} (${i+1} из ${list.length}), дневки…`);
+      const daily=useF?await finamCandles(sec,24,dFrom,P.till,P.wait):await issCandles(sec,24,dFrom,P.till,P.wait);
+      let hourly=[];
+      if(P.horizon==="intra"){setProgress(`${src}: загружаю ${sec} (${i+1} из ${list.length}), часовики…`);
+        hourly=useF?await finamCandles(sec,60,hFrom,P.till,P.wait):await issCandles(sec,60,hFrom,P.till,P.wait)}
+      if(!daily.length){setProgress(`${sec}: баров нет, пропускаю`,"warn");continue}
+      DATA[sec]={daily,hourly};LOADED.push(sec);
+      await sleep(P.wait);
+    }
+    for(const k of Object.keys(DAYCTX))delete DAYCTX[k];
+    setProgress(`Загружено ${LOADED.length} бумаг из ${src}. `+(useF?"Котировки в реальном времени.":"Внимание: ISS отдаёт котировки с задержкой 15 минут — для живого скринера введи токен Finam."),useF?"ok":"warn");
+    $("btnScreen").disabled=$("btnSim").disabled=!LOADED.length;
+  }catch(e){setProgress("Ошибка загрузки: "+e.message+". Проверь интернет и доступ к iss.moex.com.","bad")}
+  $("btnLoad").disabled=false;
+}
+async function loadTop(){
+  try{setProgress("Считываю обороты TQBR…");await issSecurities();
+    const n=Math.max(5,+$("topN").value||40);
+    const top=Object.entries(META).filter(([s,m])=>m.val>0&&!/^(RU000|SU)/.test(s)).sort((a,b)=>b[1].val-a[1].val).slice(0,n).map(x=>x[0]);
+    $("tickers").value=top.join(", ");setProgress(`Взял ${top.length} самых оборотистых бумаг сегодня.`,"ok")}
+  catch(e){setProgress("Не удалось получить список: "+e.message,"bad")}
+}
+
+/* ---- скринер: разбор на последнем закрытом баре ---- */
+function runScreen(){
+  const P=readP();SCREEN=[];
+  for(const sec of LOADED){
+    let r;
+    if(P.horizon==="intra"){const H=DATA[sec].hourly;let i=H.length-1;
+      while(i>=0&&!(CORE_H.includes(H[i].hh)&&H[i].hh<=17&&H[i].t+3600e3<=Date.now()))i--;   // только закрытые бары
+      r=i>=0?decideIntra(sec,i,P):{sec,skip:"часовиков нет",st:1};if(i>=0)r.idx=i}
+    else{const D=DATA[sec].daily,today=dstr(Date.now());
+      const k=D.length&&D[D.length-1].d>=today?D.length-2:D.length-1;   // сегодняшний частичный бар — «второй бар» модели, не опора
+      r=k>=1?decideSwing(sec,k,P):{sec,skip:"дневок нет",st:1}}
+    SCREEN.push(r);
+  }
+  SCREEN.sort((a,b)=>(b.ok?1:0)-(a.ok?1:0)||(b.st||0)-(a.st||0));
+  const tb=$("list").querySelector("tbody");tb.innerHTML="";
+  const funnel={};SCREEN.forEach(r=>{const k=r.ok?"сигнал":(r.skip||"").replace(/[\d,.]+/g,"N");funnel[k]=(funnel[k]||0)+1});
+  SCREEN.forEach((r,n)=>{const tr=document.createElement("tr");tr.className="pick";tr.dataset.n=n;
+    tr.innerHTML=`<td>${esc(r.sec)}</td><td class="${r.ok?"ok":"no"}">${esc(r.ok?`${r.plan} ${r.dirShort?"шорт":"лонг"} · ${r.signal}`:r.skip)}</td><td class="r">${r.ok?r.rr.toFixed(1):""}</td>`;
+    tr.addEventListener("click",()=>showScreen(n,tr));tb.appendChild(tr)});
+  const top=Object.entries(funnel).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${v} × ${k}`).join("\n");
+  $("explain").innerHTML=`<b>Воронка скринера</b> (${SCREEN.length} бумаг):\n${esc(top)}\n\nВыбери бумагу слева.`;
+  $("kRaw").innerHTML="";$("kPort").innerHTML="";$("trades").innerHTML="";
+}
+function showScreen(n,tr){
+  document.querySelectorAll("#list tr.sel").forEach(x=>x.classList.remove("sel"));tr.classList.add("sel");
+  const r=SCREEN[n],P=readP(),kind=P.horizon;
+  const zones=r.live||[],near=r.near;
+  const series=kind==="intra"?DATA[r.sec].hourly.filter(b=>CORE_H.includes(b.hh)):DATA[r.sec].daily;
+  const focusT=r.tDec||series[series.length-1].t;
+  const touch=near?touchesOf(series,near,series.length-160,series.length):[];
+  setChart(r.sec,kind,focusT,zones,r.ok?r:null,[],touch);
+  let txt=`<b>${esc(r.sec)}</b>${META[r.sec]?" · "+esc(META[r.sec].name):""}\n`;
+  if(r.ok)txt+=`<b>${esc(r.plan)} ${r.dirShort?"шорт":"лонг"}</b> по сигналу «${esc(r.signal)}»\nуровень ${esc(r.level)} · вход ${fmt(r.entry)} · стоп ${fmt(r.stop)} (R = ${fmt(r.R)}${r.slip?", в т.ч. проскальзывание "+fmt(r.slip):""}) · тейк ${fmt(r.tp)}\nдо цели ${fmt(r.tgt)}: ${r.rr.toFixed(1)} стопов · тренд дневки ${esc(r.trend)}${r.counter?" · контртренд, расчётный стоп 0,1%":""}`;
+  else txt+=`<b>Сделки нет:</b> ${esc(r.skip)}${r.why?"\n"+esc(r.why):""}`;
+  if(r.mo)txt+=`\n\nмодель у уровня ${near?fmt(near.lo)+"–"+fmt(near.hi):""}: подход — ${esc(r.mo.approach)}; `+esc(r.mo.signals.map(x=>`${x.name} — ${x.state}${x.act?" ("+x.act+")":""}`).join("; ")||"признаков нет")+`\nдо уровня ${r.dA!=null?r.dA.toFixed(2):"—"} дневного ATR${r.aH?" · часовой ATR "+fmt(r.aH):""}${r.aD?" · дневной ATR "+fmt(r.aD):""}`;
+  $("explain").innerHTML=txt;
+}
+
+/* ---- симуляция ---- */
+async function runSim(){
+  const P=readP();TRADES=[];
+  const fromT=Date.parse(P.from+"T00:00:00+03:00"),tillT=Date.parse(P.till+"T23:59:59+03:00");
+  $("btnSim").disabled=true;
+  for(let i=0;i<LOADED.length;i++){const sec=LOADED[i];setProgress(`Симуляция ${sec} (${i+1} из ${LOADED.length})…`);
+    await sleep(0);
+    try{if(P.horizon==="intra")simIntra(sec,P,fromT,tillT,TRADES);else simSwing(sec,P,fromT,tillT,TRADES)}
+    catch(e){console.error(sec,e);setProgress(`${sec}: ошибка симуляции — ${e.message}`,"bad")}
+  }
+  PORT=portfolioPass(TRADES,P);
+  setProgress(`Готово: ${TRADES.length} сделок по бумагам, ${PORT.length} прошли портфельные правила.`,"ok");
+  renderStats();renderTrades();$("btnSim").disabled=false;$("btnCsv").disabled=!TRADES.length;
+}
+function kpi(el,s){if(!s){el.innerHTML="<div><span>сделок</span>0</div>";return}
+  const f=x=>(x>=0?"+":"")+x.toFixed(2);
+  el.innerHTML=[["сделок",s.n],["побед",s.winPct.toFixed(0)+"%"],["итог брутто, R",f(s.gross)],["итог нетто, R",f(s.net)],
+    ["средняя нетто, R",f(s.avgNet)],["профит-фактор",isFinite(s.pf)?s.pf.toFixed(2):"∞"],["макс. просадка, R",s.dd.toFixed(1)],["комиссия всего, R",s.comm.toFixed(1)]]
+    .map(([k,v])=>`<div><span>${k}</span>${v}</div>`).join("");}
+function renderStats(){
+  const sr=stats(TRADES),sp=stats(PORT);kpi($("kRaw"),sr);kpi($("kPort"),sp);
+  if(sr){const rows=byPlan(TRADES).map(([k,s])=>`${k}: ${s.n} сделок, побед ${s.winPct.toFixed(0)}%, нетто ${s.net>=0?"+":""}${s.net.toFixed(1)}R`).join("\n");
+    $("explain").innerHTML=`<b>По моделям (все бумаги):</b>\n${esc(rows)}\n\nКликни сделку внизу — покажу её на графике.`}
+  drawEquity(sp?sp.curve:[]);
+}
+function drawEquity(curve){
+  const cv=$("equity");const W=cv.clientWidth||600,H=cv.clientHeight||150;const dpr=window.devicePixelRatio||1;
+  cv.width=W*dpr;cv.height=H*dpr;const g=cv.getContext("2d");g.setTransform(dpr,0,0,dpr,0,0);g.fillStyle="#10151d";g.fillRect(0,0,W,H);
+  if(!curve.length){g.fillStyle="#5d6778";g.font="12px Segoe UI, sans-serif";g.fillText("Кривая нетто-результата портфеля в R появится после симуляции",12,20);return}
+  const eqs=[0,...curve.map(c=>c.eq)];const lo=Math.min(...eqs),hi=Math.max(...eqs);const y=v=>8+(hi-v)/((hi-lo)||1)*(H-24);
+  g.strokeStyle="#293244";g.beginPath();g.moveTo(0,y(0));g.lineTo(W,y(0));g.stroke();
+  g.strokeStyle="#e0a54a";g.lineWidth=1.5;g.beginPath();g.moveTo(0,y(0));curve.forEach((c,i)=>g.lineTo((i+1)/curve.length*W,y(c.eq)));g.stroke();
+  g.fillStyle="#8d97a7";g.font="11px Segoe UI, sans-serif";g.fillText(`${(eqs[eqs.length-1]>=0?"+":"")+eqs[eqs.length-1].toFixed(1)}R`,W-56,y(eqs[eqs.length-1])-4);
+}
+function renderTrades(){
+  const inPort=new Set(PORT);
+  const rows=[...TRADES].sort((a,b)=>b.tFill-a.tFill);
+  $("trades").innerHTML=`<table><thead><tr><th>Бумага</th><th>Вход</th><th>Модель</th><th>Напр.</th><th class="r">Вход</th><th class="r">Стоп</th><th class="r">Тейк</th><th class="r">Выход</th><th>Причина</th><th class="r">Брутто R</th><th class="r">Нетто R</th><th>Портфель</th></tr></thead><tbody>`
+    +rows.map((t,n)=>`<tr class="pick" data-n="${n}"><td>${esc(t.sec)}</td><td>${mskStr(t.tFill)}</td><td>${esc(t.plan)}</td><td>${t.dirShort?"шорт":"лонг"}</td><td class="r">${fmt(t.fill)}</td><td class="r">${fmt(t.stop)}</td><td class="r">${fmt(t.tp)}</td><td class="r">${fmt(t.exit)}</td><td>${esc(t.reason)}</td><td class="r ${t.gross>=0?"ok":"bad"}">${t.gross.toFixed(2)}</td><td class="r ${t.net>=0?"ok":"bad"}">${t.net.toFixed(2)}</td><td>${inPort.has(t)?"да":"нет"}</td></tr>`).join("")+`</tbody></table>`;
+  $("trades").querySelectorAll("tr.pick").forEach(tr=>tr.addEventListener("click",()=>showTrade(rows[+tr.dataset.n],tr)));
+  const tb=$("list").querySelector("tbody");tb.innerHTML="";
+  const perSec={};TRADES.forEach(t=>{(perSec[t.sec]=perSec[t.sec]||[]).push(t)});
+  Object.entries(perSec).sort((a,b)=>b[1].reduce((x,y)=>x+y.net,0)-a[1].reduce((x,y)=>x+y.net,0)).forEach(([sec,ts])=>{
+    const net=ts.reduce((a,t)=>a+t.net,0);const tr=document.createElement("tr");tr.className="pick";
+    tr.innerHTML=`<td>${esc(sec)}</td><td>${ts.length} сделок</td><td class="r ${net>=0?"ok":"bad"}">${net.toFixed(1)}</td>`;
+    tr.addEventListener("click",()=>{showTrade(ts[ts.length-1],tr)});tb.appendChild(tr)});
+}
+function showTrade(t,tr){
+  document.querySelectorAll("tr.sel").forEach(x=>x.classList.remove("sel"));if(tr)tr.classList.add("sel");
+  const series=t.kind==="intra"?DATA[t.sec].hourly.filter(b=>CORE_H.includes(b.hh)):DATA[t.sec].daily;
+  const fi=series.findIndex(b=>b.t>=t.tFill);
+  const touch=t.near?touchesOf(series,t.near,fi-60,fi+1):[];
+  setChart(t.sec,t.kind,t.tFill,t.live||[],t,TRADES.filter(x=>x.sec===t.sec),touch);
+  $("explain").innerHTML=`<b>${esc(t.sec)} · ${esc(t.plan)} ${t.dirShort?"шорт":"лонг"}</b> по сигналу «${esc(t.signal)}»\nзаявка после бара ${mskStr(t.tDec-90e3)} · исполнение ${mskStr(t.tFill)} по ${fmt(t.fill)} · выход ${mskStr(t.tExit)} по ${fmt(t.exit)} — ${esc(t.reason)}\nуровень ${esc(t.level)} · стоп ${fmt(t.stop)} · тейк ${fmt(t.tp)} · R = ${fmt(t.R)} · до цели ${t.rr.toFixed(1)} стопов · тренд ${esc(t.trend)}${t.counter?" (контртренд)":""}\nрезультат: ${t.gross.toFixed(2)}R брутто, комиссия ${t.commR.toFixed(2)}R, ${t.net.toFixed(2)}R нетто\n\nмодель: подход — ${esc(t.mo.approach)}; ${esc(t.mo.signals.map(x=>`${x.name} — ${x.state}${x.act?" ("+x.act+")":""}`).join("; "))}`;
+}
+function exportCsv(){
+  const head=["sec","kind","plan","signal","dir","placed","filled","exited","entry","fill","stop","tp","exit","reason","R","grossR","commR","netR","portfolio"];
+  const inPort=new Set(PORT);
+  const lines=[head.join(";")].concat(TRADES.map(t=>[t.sec,t.kind,t.plan,t.signal,t.dirShort?"short":"long",mskStr(t.tDec-90e3),mskStr(t.tFill),mskStr(t.tExit),t.entry,t.fill,t.stop,t.tp,t.exit,t.reason,t.R,t.gross.toFixed(3),t.commR.toFixed(3),t.net.toFixed(3),inPort.has(t)?1:0].join(";")));
+  const blob=new Blob(["\ufeff"+lines.join("\n")],{type:"text/csv"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`levels_sim_${$("horizon").value}_${$("from").value}_${$("till").value}.csv`;a.click();
+}
+if(typeof document!=="undefined"){
+  window.addEventListener("DOMContentLoaded",()=>{
+    const today=new Date().toISOString().slice(0,10);$("till").value=today;$("from").value=addDays(today,-180);
+    $("btnLoad").addEventListener("click",loadAll);$("btnTop").addEventListener("click",loadTop);
+    $("btnScreen").addEventListener("click",runScreen);$("btnSim").addEventListener("click",runSim);$("btnCsv").addEventListener("click",exportCsv);
+    chartEvents();drawChart();drawEquity([]);
+  });
+}
+</script>
+</body>
+</html>
