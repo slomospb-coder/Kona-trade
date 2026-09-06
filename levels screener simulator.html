@@ -60,14 +60,21 @@ canvas#chart{touch-action:none}
 <header>
   <div class="head-row">
     <h1>Уровни: скринер и симулятор</h1>
-    <span class="sub">движок торгового робота v9.3 без изменений · данные Finam (реальное время) или MOEX ISS · часовики и дневки</span>
+    <span class="sub">движок торгового робота v9.3 без изменений · МосБиржа, США и другие биржи Finam · часовики и дневки</span>
   </div>
   <div class="controls">
     <div>
-      <label for="tickers">Бумаги TQBR (через запятую или пробел)</label>
+      <label for="market">Рынок и готовый список</label>
+      <select id="market" style="margin-bottom:6px">
+        <option value="moex">МосБиржа, ликвидные (TQBR)</option>
+        <option value="ndx">США: Nasdaq-100 (@XNGS) — нужен токен Finam</option>
+        <option value="nyse">США: NYSE крупнейшие (@XNYS) — нужен токен Finam</option>
+        <option value="custom">свой список</option>
+      </select>
+      <label for="tickers">Бумаги: тикер, для иностранных — с биржей, например AAPL@XNGS, JPM@XNYS, SAP@XETR</label>
       <textarea id="tickers">SBER, GAZP, LKOH, ROSN, NVTK, GMKN, TATN, SNGS, SNGSP, MTSS, MGNT, PLZL, CHMF, NLMK, MAGN, ALRS, VTBR, MOEX, YDEX, OZON, AFLT, FLOT, SIBN, PIKK, POSI, PHOR, RUAL, IRAO, HYDR, RTKM, MTLR, AFKS, BSPB, TATNP, SBERP, TRNFP, X5, T, ASTR, SVCB</textarea>
       <div class="actions">
-        <button id="btnTop">Взять топ по обороту с биржи</button>
+        <button id="btnTop">Взять топ МосБиржи по обороту</button>
         <input id="topN" value="40" style="width:64px" title="сколько бумаг">
       </div>
     </div>
@@ -76,12 +83,12 @@ canvas#chart{touch-action:none}
       <div><label for="till">по</label><input id="till" type="date"></div>
       <div><label for="horizon">Горизонт</label>
         <select id="horizon"><option value="intra">внутри дня, модель на часовиках</option><option value="swing">свинг, модель на дневках</option></select></div>
-      <div><label for="tmin">Оборот, млн ₽ в день, не меньше</label><input id="tmin" value="100"></div>
+      <div><label for="tmin">Оборот в день, млн в валюте бумаги, не меньше</label><input id="tmin" value="100"></div>
     </div>
     <div class="row">
       <div><label for="comm">Комиссия, % за сторону</label><input id="comm" value="0.04"></div>
       <div><label for="npos">Позиций одновременно</label><input id="npos" value="2"></div>
-      <div><label for="wait">Пауза между запросами, мс</label><input id="wait" value="120"></div>
+      <div><label for="wait">Пауза между запросами, мс</label><input id="wait" value="350"></div>
       <div style="min-width:220px"><label for="ftok">Токен Finam: бары в реальном времени (без него — ISS, задержка 15 мин)</label><input id="ftok" type="password" autocomplete="off" spellcheck="false" placeholder="tapi_sk_…"></div>
     </div>
   </div>
@@ -109,6 +116,7 @@ canvas#chart{touch-action:none}
 <footer>
   <b>Что здесь считается.</b> Уровни и расчётный ATR — по дневным барам, закрытым до момента решения (без подглядывания вперёд). Модель отбоя, пробоя и ложного пробоя — на часовиках основной сессии (внутри дня) или на дневках (свинг), функция в функцию как в роботе v9.3: БСУ с любой стороны уровня, БПУ1 точно, БПУ2 с люфтом, поджатие и выравнивающий бар, импульс по пробойному бару, стрик и хвосты сложного ЛП, память о проколах по всем сессиям, контртрендовая сделка от расчётного стопа 0,1%. Ворота те же: пять стопов в ATR, шесть стопов до цели, технический ATR не меньше расчётного, стоп не больше расчётного +20% (ЛП +30%), правило 75–80% по направлению сделки, первый час без отбоя, за 40 минут до конца сессии входов нет. Решение принимается через 90 секунд после закрытия бара, как у робота. Тейк — 3R.<br>
   <b>Как исполняется.</b> Отбой — лимитка у уровня; пробой и ЛП — условная заявка с проскальзыванием, уже заложенным в стоп. Если в одном баре цена дошла и до входа, и до стопа — считается стоп (пессимистично). Гэп через стоп исполняется по открытию. Неисполненная заявка снимается, когда закрытие бара ушло на два стопа, когда уровень пробит и с концом основной сессии; внутридневная позиция закрывается по закрытию последнего бара сессии; свинговая — стопом, тейком или через семь календарных дней. Комиссия переводится в доли R: при стопе 0,2% цены 0,04% за сторону съедает 0,4R за круг — это и есть главный враг часовой торговли, смотри разницу «брутто» и «нетто».<br>
+  <b>Рынки.</b> Сессия каждой биржи считается в её местном времени: МосБиржа 10:00–18:40, Nasdaq и NYSE 09:30–16:00 Нью-Йорка, Xetra 09:00–17:30, Лондон 08:00–16:30; первый час, ворота перед закрытием, конец сессии и усечённые бары — от этих границ. Оборот и цены — в валюте бумаги. Иностранные бумаги грузятся только через Finam (ISS их не знает). Если Finam не отдаёт бары какой-то биржи, страница скажет об этом по конкретной бумаге.<br>
   <b>Источники.</b> С токеном Finam бары приходят из Finam Trade API в реальном времени — тем же путём, что у робота; токен живёт только в памяти страницы и уходит только на api.finam.ru. Без токена данные берутся из открытого MOEX ISS, где бесплатные котировки отстают на 15 минут: для истории и симуляции это неважно, для скринера на последнем баре — критично.<br>
   <b>Чего тут нет.</b> Объёма позиции в деньгах и лотности (всё в R), недельного подтверждения уровня (у робота оно только повышает оценку), новостей, реального стакана. Это учебный инструмент для проверки логики, а не инвестиционная рекомендация.
 </footer>
@@ -301,6 +309,41 @@ const META={};           // sec -> {name,lot,pstep,val}
 const MSK=3*3600e3;
 const dstr=t=>new Date(t+MSK).toISOString().slice(0,10);
 const mskStr=t=>new Date(t+MSK).toISOString().slice(0,16).replace("T"," ");
+/* ==================== рынки и местное время сессий ==================== */
+const MARKETS={
+  MISX:{tz:"Europe/Moscow",open:600,close:1120,cur:"₽"},
+  XNGS:{tz:"America/New_York",open:570,close:960,cur:"$"},
+  XNYS:{tz:"America/New_York",open:570,close:960,cur:"$"},
+  XASE:{tz:"America/New_York",open:570,close:960,cur:"$"},
+  ARCX:{tz:"America/New_York",open:570,close:960,cur:"$"},
+  XETR:{tz:"Europe/Berlin",open:540,close:1050,cur:"€"},
+  XLON:{tz:"Europe/London",open:480,close:990,cur:"£"},
+  XPAR:{tz:"Europe/Paris",open:540,close:1050,cur:"€"},
+  XAMS:{tz:"Europe/Amsterdam",open:540,close:1050,cur:"€"},
+  XHKG:{tz:"Asia/Hong_Kong",open:570,close:960,cur:"HK$"}
+};
+const exch=sec=>(String(sec).split("@")[1]||"MISX").toUpperCase();
+const mkt=sec=>MARKETS[exch(sec)]||{tz:"UTC",open:0,close:1440,cur:""};
+const LFMT={};
+function lfmt(tz){return LFMT[tz]||(LFMT[tz]=new Intl.DateTimeFormat("en-GB",{timeZone:tz,hour12:false,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}))}
+/* местная дата "YYYY-MM-DD" и минуты от полуночи в часовом поясе биржи */
+function localParts(t,tz){
+  const p={};lfmt(tz).formatToParts(new Date(t)).forEach(x=>p[x.type]=x.value);
+  const h=+p.hour===24?0:+p.hour;
+  return{ld:`${p.year}-${p.month}-${p.day}`,lm:h*60+(+p.minute)};
+}
+const localStr=(t,tz)=>{const q=localParts(t,tz);return`${q.ld.slice(5)} ${String(Math.floor(q.lm/60)).padStart(2,"0")}:${String(q.lm%60).padStart(2,"0")}`};
+/* Разметка баров под сессию биржи: ld — местная торговая дата, core — бар
+   пересекает основную сессию, partial — не целиком внутри неё, lastCore —
+   последний бар сессии в этот день (на нём закрываются позиции). */
+function tagBars(sec){
+  const M=mkt(sec),D=DATA[sec];
+  for(const b of D.daily){b.ld=b.d}
+  const H=D.hourly;
+  for(const b of H){const q=localParts(b.t,M.tz);b.ld=q.ld;b.lm=q.lm;b.d=q.ld;
+    b.core=(q.lm+60>M.open)&&(q.lm<M.close);b.partial=b.core&&(q.lm<M.open||q.lm+60>M.close);b.lastCore=false}
+  for(let i=0;i<H.length;i++){if(!H[i].core)continue;const n=H[i+1];if(!n||n.ld!==H[i].ld||!n.core)H[i].lastCore=true}
+}
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function issJson(u){
   const r=await fetch(u);
@@ -340,7 +383,7 @@ function normBars(rows,interval){
     if(seen.has(key)||!isFinite(t))continue;seen.add(key);
     const o=+r.open,h=+r.high,l=+r.low,c=+r.close;
     if(![o,h,l,c].every(isFinite)||h<l)continue;
-    out.push({d,hh,t,o,h,l,c,v:+r.volume||0,val:+r.value||0,partial:interval===60&&hh===18,ts:b});
+    out.push({d,hh,t:interval===24?Date.parse(d+"T12:00:00Z"):t,o,h,l,c,v:+r.volume||0,val:+r.value||0,partial:false,ts:b});
   }
   return out.sort((a,b)=>a.t-b.t);
 }
@@ -363,34 +406,39 @@ async function fauth(){
   FJWT=JSON.parse(t).token;FJWT_AT=Date.now();
   if(!FJWT)throw new Error("Finam: в ответе нет token");
 }
+/* Лимит запросов Finam (429): ждём по нарастающей до минуты суммарно и
+   после первого же отказа замедляем весь дальнейший обход. */
+let PACE=0,SLOWED=false;
 async function freq(path,tries=0){
   if(!FJWT||Date.now()-FJWT_AT>13*60e3)await fauth();
   const r=await fetch(FAPI+path,{headers:{Accept:"application/json",Authorization:FJWT}});
   if(r.status===401&&tries<2){FJWT=null;return freq(path,tries+1)}
-  if(r.status===429&&tries<3){await sleep(1500*(tries+1));return freq(path,tries+1)}
+  if(r.status===429&&tries<5){SLOWED=true;PACE=Math.max(PACE,800);await sleep(2000*Math.pow(2,tries));return freq(path,tries+1)}
   const t=await r.text();let j=null;try{j=JSON.parse(t)}catch(e){}
   return{code:r.status,json:j,text:t};
 }
-function normFinam(j,interval){
+function normFinam(j,interval,tz){
   const out=[];
   for(const b of (findArray(j)||[])){
     const ts=String(b.timestamp||b.time||""),t0=Date.parse(ts);if(!isFinite(t0))continue;
     const o=V(b.open),h=V(b.high),l=V(b.low),c=V(b.close),v=V(b.volume)||0;
     if(![o,h,l,c].every(isFinite)||h<l)continue;
-    const d=dstr(t0),hh=new Date(t0+MSK).getUTCHours();
-    out.push({d,hh,t:interval===24?Date.parse(d+"T00:00:00+03:00"):t0,o,h,l,c,v,val:v*c,partial:interval===60&&hh===18,ts});
+    /* дневной бар помечен своей торговой датой в поясе биржи; штамп может
+       стоять и в полночь UTC, и в полночь по местному — сдвиг на полдня это снимает */
+    const q=localParts(interval===24?t0+12*3600e3:t0,tz);
+    out.push({d:q.ld,hh:Math.floor(q.lm/60),t:interval===24?Date.parse(q.ld+"T12:00:00Z"):t0,o,h,l,c,v,val:v*c,partial:false,ts});
   }
   return out;
 }
 async function finamCandles(sec,interval,from,till,wait){
-  const tf=interval===24?"TIME_FRAME_D":"TIME_FRAME_H1",sym=sec.includes("@")?sec:sec+"@MISX",chunk=interval===24?360:28;
+  const tf=interval===24?"TIME_FRAME_D":"TIME_FRAME_H1",sym=sec.includes("@")?sec:sec+"@MISX",chunk=interval===24?360:30,tz=mkt(sec).tz;
   let out=[],a=from;
   while(a<=till){
     const b=addDays(a,chunk-1)<till?addDays(a,chunk-1):till;
     const r=await freq(`/v1/instruments/${encodeURIComponent(sym)}/bars?timeframe=${tf}&interval.start_time=${a}T00:00:00Z&interval.end_time=${b}T23:59:59Z`);
     if(r.code!==200)throw new Error(`Finam ${sym}: HTTP ${r.code} ${(r.text||"").slice(0,100)}`);
-    out=out.concat(normFinam(r.json,interval));
-    a=addDays(b,1);if(wait)await sleep(wait);
+    out=out.concat(normFinam(r.json,interval,tz));
+    a=addDays(b,1);await sleep(Math.max(wait||0,PACE));
   }
   const seen=new Set();
   return out.filter(x=>{const k=interval===24?x.d:x.t;if(seen.has(k))return false;seen.add(k);return true}).sort((x,y)=>x.t-y.t);
@@ -429,14 +477,11 @@ const nearest=(live,px)=>live.reduce((p,c)=>Math.min(Math.abs(px-c.lo),Math.abs(
 
 /* Незакрытый дневной бар — из часовиков этого дня до бара i включительно. */
 function liveFromHourly(hourly,i){
-  const d=hourly[i].d;let o=null,h=-Infinity,l=Infinity,v=0;
-  for(let k=i;k>=0&&hourly[k].d===d;k--){o=hourly[k].o;h=Math.max(h,hourly[k].h);l=Math.min(l,hourly[k].l);v+=hourly[k].v}
+  const d=hourly[i].ld;let o=null,h=-Infinity,l=Infinity,v=0;
+  for(let k=i;k>=0&&hourly[k].ld===d;k--){o=hourly[k].o;h=Math.max(h,hourly[k].h);l=Math.min(l,hourly[k].l);v+=hourly[k].v}
   return{d,o,h,l,c:hourly[i].c,v};
 }
 /* ==================== разбор внутри дня — порт decide() робота ==================== */
-const CORE_H=[10,11,12,13,14,15,16,17,18];      // часы основной сессии МосБиржи
-const CORE_START_H=10, CORE_END_MIN=18*60+40;    // 10:00–18:40 МСК
-const mskMin=t=>{const x=new Date(t+MSK);return x.getUTCHours()*60+x.getUTCMinutes()};
 
 function decideIntra(sec,i,P){
   const hourly=DATA[sec].hourly, bar=hourly[i];
@@ -444,7 +489,8 @@ function decideIntra(sec,i,P){
   const tDec=bar.t+3600e3+90e3;                  // решение через 90 с после закрытия бара, как у робота
   const live=liveFromHourly(hourly,i);
   const pxD=live.c;
-  const ctx=dayCtx(sec,bar.d,live.o??pxD);
+  const M=mkt(sec);
+  const ctx=dayCtx(sec,bar.ld,live.o??pxD);
   if(ctx.skip)return{sec,skip:ctx.skip,st:1};
   const{dc,aD,step,lv,live:liveLv,extLo,extHi,gp}=ctx;
   if(ctx.turn<P.tmin)return{sec,skip:`оборот ${(ctx.turn/1e6).toFixed(0)} млн ₽ — ниже порога`,st:1};
@@ -466,12 +512,12 @@ function decideIntra(sec,i,P){
   if(Math.abs(edgeD-nx.mid)/cstop<CFG.stopsToTarget)return{sec,skip:`до цели ${(Math.abs(edgeD-nx.mid)/cstop).toFixed(1)} стопов`,st:4};
 
   /* фаза 2: часовик основной сессии, память о проколах по всем сессиям */
-  const mm=mskMin(tDec);
-  if(!(bar.hh>=CORE_START_H&&bar.hh<=17))return{sec,skip:"не основная сессия",st:5};
-  if(CORE_END_MIN-mm<40)return{sec,skip:"до конца основной сессии меньше 40 минут — внутри дня не входим",st:5};
+  const mm=localParts(tDec,M.tz).lm;
+  if(!bar.core||bar.lastCore)return{sec,skip:"не основная сессия",st:5};
+  if(M.close-mm<40)return{sec,skip:"до конца основной сессии меньше 40 минут — внутри дня не входим",st:5};
   const doneAll=hourly.slice(0,i+1);
   const rawDone=doneAll.slice(-CFG.depthH*24);
-  let hc=doneAll.filter(b=>CORE_H.includes(b.hh)&&b.t>=bar.t-CFG.depthH*864e5);
+  let hc=doneAll.filter(b=>b.core&&b.t>=bar.t-CFG.depthH*864e5);
   if(hc.length<CFG.minHourBars)return{sec,skip:`часовых баров ${hc.length}`,st:5};
   const px=hc[hc.length-1].c;
   const bpd=hc.length/Math.max(1,new Set(hc.map(b=>b.d)).size);
@@ -511,7 +557,7 @@ function decideIntra(sec,i,P){
   const used=(Math.max(live.h,pc)-Math.min(live.l,pc))/aD.atr*100;
   const dayDir=live.c>=pc?1:-1, along=(dayDir>0&&!dirShort)||(dayDir<0&&dirShort);
   if(used>CFG.dayUsedMax&&along)return{...base,skip:`день прошёл ${used.toFixed(0)}% ATR в сторону сделки`,st:6,plan};
-  if(plan==="отбой"&&mm-CORE_START_H*60<60)return{...base,skip:"первый час торгов — отбой не торгуем",st:6,plan};
+  if(plan==="отбой"&&mm-M.open<60)return{...base,skip:"первый час торгов — отбой не торгуем",st:6,plan};
   const pq=(META[sec]&&META[sec].pstep)||step;
   entry=qdir(entry,pq,dirShort);stop=qdir(stop,pq,!dirShort);
   let R=Math.max(Math.abs(stop-entry),pq);
@@ -635,15 +681,15 @@ function simIntra(sec,P,fromT,tillT,out){
   const H=DATA[sec].hourly;let ord=null,pos=null;
   for(let j=0;j<H.length;j++){
     const bar=H[j];if(bar.t<fromT-CFG.depthH*864e5)continue;if(bar.t>tillT)break;
-    const core=CORE_H.includes(bar.hh);
+    const core=bar.core;
     if(pos){
       let ex=core?exitOnBar(pos,bar):null;
-      if(!ex&&core&&bar.hh===18)ex={px:bar.c,reason:"конец сессии"};
-      if(!ex&&!core&&bar.d!==pos.day)ex={px:bar.o,reason:"перенос через ночь (не должно случаться)"};
+      if(!ex&&core&&bar.lastCore)ex={px:bar.c,reason:"конец сессии"};
+      if(!ex&&!core&&bar.ld!==pos.day)ex={px:bar.o,reason:"перенос через ночь (не должно случаться)"};
       if(ex){closeTrade(pos,ex.px,ex.reason,bar.t,P,out);pos=null}
     }
     if(ord&&!pos){
-      if(bar.d!==ord.day||bar.hh>17||!core){ord=null}
+      if(bar.ld!==ord.day||bar.lastCore||!core){ord=null}
       else{
         const broken=ord.dirShort?bar.h>=ord.stop:bar.l<=ord.stop;
         const fill=fillOnBar(ord,bar);
@@ -656,9 +702,9 @@ function simIntra(sec,P,fromT,tillT,out){
         else if(Math.abs(bar.c-ord.entry)>=2*ord.R)ord=null;
       }
     }
-    if(!ord&&!pos&&bar.t>=fromT&&bar.hh>=10&&bar.hh<=16){
+    if(!ord&&!pos&&bar.t>=fromT&&core&&!bar.lastCore){
       const d=decideIntra(sec,j,P);
-      if(d.ok)ord={...d,day:bar.d,tPlaced:bar.t+3600e3};
+      if(d.ok)ord={...d,day:bar.ld,tPlaced:bar.t+3600e3};
     }
   }
   if(pos){closeTrade(pos,H[H.length-1].c,"конец данных",H[H.length-1].t,P,out)}
@@ -699,7 +745,7 @@ function portfolioPass(trades,P){
   const t=[...trades].sort((a,b)=>a.tFill-b.tFill);
   const open=[],kept=[];let day=null,streak=0,halted=false;
   for(const tr of t){
-    const d=dstr(tr.tFill);
+    const d=tr.day||dstr(tr.tFill);
     if(d!==day){day=d;streak=0;halted=false}
     for(let i=open.length-1;i>=0;i--)if(open[i].tExit<=tr.tFill)open.splice(i,1);
     if(halted||open.length>=P.npos)continue;
@@ -723,7 +769,7 @@ const byPlan=trades=>{const m={};trades.forEach(x=>{const k=x.plan.replace(" (д
 /* ==================== график ==================== */
 const CH={sec:null,series:[],kind:"intra",focus:null,zones:[],plan:null,trades:[],touch:[],n:120,off:0,drag:null};
 function setChart(sec,kind,focusT,zones,plan,trades,touch){
-  CH.sec=sec;CH.kind=kind;CH.series=kind==="intra"?DATA[sec].hourly.filter(b=>CORE_H.includes(b.hh)):DATA[sec].daily;
+  CH.sec=sec;CH.kind=kind;CH.series=kind==="intra"?DATA[sec].hourly.filter(b=>b.core):DATA[sec].daily;
   CH.zones=zones||[];CH.plan=plan||null;CH.trades=trades||[];CH.touch=touch||[];
   let fi=CH.series.findIndex(b=>b.t>=focusT);if(fi<0)fi=CH.series.length-1;
   CH.n=kind==="intra"?120:140;CH.off=Math.max(0,Math.min(CH.series.length-CH.n,fi-Math.round(CH.n*0.7)));
@@ -774,8 +820,9 @@ function drawChart(){
   g.fillStyle="#8d97a7";g.font="11px Segoe UI, sans-serif";
   for(let k=0;k<=6;k++){const p=lo+(hi-lo)*k/6;g.fillText(fmt(p),padL+plotW+6,y(p)+4)}
   const stepL=Math.max(1,Math.round(bars.length/8));
-  bars.forEach((c,i)=>{if(i%stepL===0){g.fillText(CH.kind==="intra"?mskStr(c.t).slice(5):c.d.slice(2),padL+i*xw,Hh-8)}});
-  g.fillStyle="#5d6778";g.fillText(`${CH.sec} · ${CH.kind==="intra"?"часовики основной сессии":"дневки"}`,padL+4,Hh-8-0+0);
+  const tz=mkt(CH.sec).tz;
+  bars.forEach((c,i)=>{if(i%stepL===0){g.fillText(CH.kind==="intra"?localStr(c.t,tz):c.d.slice(2),padL+i*xw,Hh-8)}});
+  g.fillStyle="#5d6778";g.fillText(`${CH.sec} · ${CH.kind==="intra"?"часовики основной сессии, время биржи":"дневки"}`,padL+4,Hh-8);
 }
 function chartEvents(){
   const cv=document.getElementById("chart");
@@ -798,10 +845,16 @@ function chartEvents(){
 const touchesOf=(series,z,a,b)=>{const out=[];for(let i=Math.max(0,a);i<Math.min(series.length,b);i++){const c=series[i];if((c.h>=z.lo&&c.h<=z.hi)||(c.l<=z.hi&&c.l>=z.lo))out.push(i)}return out};
 /* ==================== интерфейс ==================== */
 let TRADES=[],PORT=[],SCREEN=[],LOADED=[];
+const PRESETS={
+  moex:{tmin:100,list:"SBER, GAZP, LKOH, ROSN, NVTK, GMKN, TATN, SNGS, SNGSP, MTSS, MGNT, PLZL, CHMF, NLMK, MAGN, ALRS, VTBR, MOEX, YDEX, OZON, AFLT, FLOT, SIBN, PIKK, POSI, PHOR, RUAL, IRAO, HYDR, RTKM, MTLR, AFKS, BSPB, TATNP, SBERP, TRNFP, X5, T, ASTR, SVCB"},
+  ndx:{tmin:20,list:["AAPL","MSFT","NVDA","AMZN","META","GOOGL","TSLA","AVGO","COST","NFLX","ASML","AMD","ADBE","PEP","CSCO","TMUS","LIN","INTU","QCOM","TXN","AMGN","ISRG","CMCSA","HON","AMAT","BKNG","ADP","VRTX","GILD","PANW","SBUX","MU","ADI","LRCX","REGN","MDLZ","KLAC","MELI","PYPL","INTC","SNPS","CDNS","CRWD","MAR","CTAS","ORLY","CSX","ABNB","NXPI","MRVL","ADSK","WDAY","PCAR","ROP","FTNT","CPRT","MNST","PAYX","ROST","AEP","CHTR","DXCM","ODFL","KDP","FAST","EA","IDXX","CTSH","VRSK","EXC","XEL","LULU","CCEP","KHC","TTWO","BKR","GEHC","CSGP","ON","DDOG","TEAM","ZS","FANG","MCHP","CDW","BIIB","WBD","ARM","DASH","TTD"].map(x=>x+"@XNGS").join(", ")},
+  nyse:{tmin:20,list:["JPM","V","MA","XOM","JNJ","PG","HD","CVX","MRK","ABBV","KO","WMT","BAC","LLY","UNH","DIS","MCD","CAT","BA","GE","IBM","GS","MS","WFC","C","AXP","MMM","NKE","T","VZ","PFE","ORCL","CRM","ACN","TMO","ABT","DHR","RTX","LMT","UNP","UPS","LOW","TGT","MDT","BMY","SPGI","BLK","SCHW","NOW","UBER","ANET","TJX","CVS","ELV","CI","DE","NEE","SO","DUK","PLD","AMT","COP","EOG","SLB","OXY","PSX","VLO","MPC","GD","NOC","ETN","EMR","ITW","PH","WM","CL","KMB","GIS","MO","PM","TSM","BABA"].map(x=>x+"@XNYS").join(", ")}
+};
+function applyPreset(){const k=$("market").value;if(!PRESETS[k])return;$("tickers").value=PRESETS[k].list;$("tmin").value=PRESETS[k].tmin}
 const $=id=>document.getElementById(id);
 function readP(){return{tmin:(+$("tmin").value||100)*1e6,comm:+$("comm").value||0,npos:Math.max(1,+$("npos").value||2),wait:+$("wait").value||0,
   horizon:$("horizon").value,from:$("from").value,till:$("till").value}}
-const tickers=()=>$("tickers").value.split(/[\s,;]+/).map(s=>s.trim().toUpperCase()).filter(Boolean);
+const tickers=()=>[...new Set($("tickers").value.split(/[\s,;]+/).map(s=>s.trim().toUpperCase()).filter(Boolean))];
 function setProgress(t,cls){const e=$("progress");e.textContent=t;e.className=cls||""}
 function esc(s){return String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]))}
 
@@ -817,24 +870,29 @@ async function loadAll(){
     let haveList=false;
     try{await issSecurities();haveList=true}catch(e){if(!useF)throw e}
     const dFrom=addDays(P.from,-460), hFrom=addDays(P.from,-45);
-    const src=useF?"Finam":"ISS";
-    LOADED=[];
+    const src=useF?"Finam":"ISS", key=`${P.from}|${P.till}|${P.horizon}|${src}`;
+    PACE=0;SLOWED=false;LOADED=[];const failed=[];
     for(let i=0;i<list.length;i++){
-      const sec=list[i];
-      if(haveList&&!META[sec]){setProgress(`${sec}: нет на TQBR, пропускаю`,"warn");await sleep(300);continue}
-      setProgress(`${src}: загружаю ${sec} (${i+1} из ${list.length}), дневки…`);
-      const daily=useF?await finamCandles(sec,24,dFrom,P.till,P.wait):await issCandles(sec,24,dFrom,P.till,P.wait);
-      let hourly=[];
-      if(P.horizon==="intra"){setProgress(`${src}: загружаю ${sec} (${i+1} из ${list.length}), часовики…`);
-        hourly=useF?await finamCandles(sec,60,hFrom,P.till,P.wait):await issCandles(sec,60,hFrom,P.till,P.wait)}
-      if(!daily.length){setProgress(`${sec}: баров нет, пропускаю`,"warn");continue}
-      DATA[sec]={daily,hourly};LOADED.push(sec);
-      await sleep(P.wait);
+      const sec=list[i],foreign=sec.includes("@")&&exch(sec)!=="MISX";
+      if(DATA[sec]&&DATA[sec].key===key){LOADED.push(sec);continue}   // уже загружено — не перекачиваем
+      if(foreign&&!useF){failed.push(sec+" (нужен токен Finam)");continue}
+      if(!foreign&&haveList&&!META[sec.split("@")[0]]){failed.push(sec+" (нет на TQBR)");continue}
+      try{
+        setProgress(`${src}: загружаю ${sec} (${i+1} из ${list.length}), дневки…${SLOWED?" — Finam просит помедленнее, замедлился":""}`);
+        const daily=useF?await finamCandles(sec,24,dFrom,P.till,P.wait):await issCandles(sec.split("@")[0],24,dFrom,P.till,P.wait);
+        let hourly=[];
+        if(P.horizon==="intra"){setProgress(`${src}: загружаю ${sec} (${i+1} из ${list.length}), часовики…`);
+          hourly=useF?await finamCandles(sec,60,hFrom,P.till,P.wait):await issCandles(sec.split("@")[0],60,hFrom,P.till,P.wait)}
+        if(!daily.length){failed.push(sec+" (баров нет)");continue}
+        DATA[sec]={daily,hourly,key};tagBars(sec);LOADED.push(sec);
+      }catch(e){failed.push(`${sec} (${e.message.slice(0,60)})`);if(/429/.test(e.message)){PACE=Math.max(PACE,1200);await sleep(5000)}}
+      await sleep(Math.max(P.wait,PACE));
     }
     for(const k of Object.keys(DAYCTX))delete DAYCTX[k];
-    setProgress(`Загружено ${LOADED.length} бумаг из ${src}. `+(useF?"Котировки в реальном времени.":"Внимание: ISS отдаёт котировки с задержкой 15 минут — для живого скринера введи токен Finam."),useF?"ok":"warn");
+    const tail=failed.length?` Не загрузились: ${failed.join("; ")}. Нажми «Загрузить данные» ещё раз — загруженное не перекачивается.`:"";
+    setProgress(`Загружено ${LOADED.length} из ${list.length} бумаг (${src}). `+(useF?"Котировки в реальном времени.":"ISS отдаёт котировки с задержкой 15 минут — для живого скринера введи токен Finam.")+tail,failed.length?"warn":"ok");
     $("btnScreen").disabled=$("btnSim").disabled=!LOADED.length;
-  }catch(e){setProgress("Ошибка загрузки: "+e.message+". Проверь интернет и доступ к iss.moex.com.","bad")}
+  }catch(e){setProgress("Ошибка загрузки: "+e.message+". Проверь интернет; при 429 подожди минуту и нажми «Загрузить данные» снова — загруженное не перекачивается.","bad")}
   $("btnLoad").disabled=false;
 }
 async function loadTop(){
@@ -851,9 +909,9 @@ function runScreen(){
   for(const sec of LOADED){
     let r;
     if(P.horizon==="intra"){const H=DATA[sec].hourly;let i=H.length-1;
-      while(i>=0&&!(CORE_H.includes(H[i].hh)&&H[i].hh<=17&&H[i].t+3600e3<=Date.now()))i--;   // только закрытые бары
+      while(i>=0&&!(H[i].core&&!H[i].lastCore&&H[i].t+3600e3<=Date.now()))i--;   // только закрытые бары сессии
       r=i>=0?decideIntra(sec,i,P):{sec,skip:"часовиков нет",st:1};if(i>=0)r.idx=i}
-    else{const D=DATA[sec].daily,today=dstr(Date.now());
+    else{const D=DATA[sec].daily,today=localParts(Date.now(),mkt(sec).tz).ld;
       const k=D.length&&D[D.length-1].d>=today?D.length-2:D.length-1;   // сегодняшний частичный бар — «второй бар» модели, не опора
       r=k>=1?decideSwing(sec,k,P):{sec,skip:"дневок нет",st:1}}
     SCREEN.push(r);
@@ -872,7 +930,7 @@ function showScreen(n,tr){
   document.querySelectorAll("#list tr.sel").forEach(x=>x.classList.remove("sel"));tr.classList.add("sel");
   const r=SCREEN[n],P=readP(),kind=P.horizon;
   const zones=r.live||[],near=r.near;
-  const series=kind==="intra"?DATA[r.sec].hourly.filter(b=>CORE_H.includes(b.hh)):DATA[r.sec].daily;
+  const series=kind==="intra"?DATA[r.sec].hourly.filter(b=>b.core):DATA[r.sec].daily;
   const focusT=r.tDec||series[series.length-1].t;
   const touch=near?touchesOf(series,near,series.length-160,series.length):[];
   setChart(r.sec,kind,focusT,zones,r.ok?r:null,[],touch);
@@ -921,7 +979,7 @@ function renderTrades(){
   const inPort=new Set(PORT);
   const rows=[...TRADES].sort((a,b)=>b.tFill-a.tFill);
   $("trades").innerHTML=`<table><thead><tr><th>Бумага</th><th>Вход</th><th>Модель</th><th>Напр.</th><th class="r">Вход</th><th class="r">Стоп</th><th class="r">Тейк</th><th class="r">Выход</th><th>Причина</th><th class="r">Брутто R</th><th class="r">Нетто R</th><th>Портфель</th></tr></thead><tbody>`
-    +rows.map((t,n)=>`<tr class="pick" data-n="${n}"><td>${esc(t.sec)}</td><td>${mskStr(t.tFill)}</td><td>${esc(t.plan)}</td><td>${t.dirShort?"шорт":"лонг"}</td><td class="r">${fmt(t.fill)}</td><td class="r">${fmt(t.stop)}</td><td class="r">${fmt(t.tp)}</td><td class="r">${fmt(t.exit)}</td><td>${esc(t.reason)}</td><td class="r ${t.gross>=0?"ok":"bad"}">${t.gross.toFixed(2)}</td><td class="r ${t.net>=0?"ok":"bad"}">${t.net.toFixed(2)}</td><td>${inPort.has(t)?"да":"нет"}</td></tr>`).join("")+`</tbody></table>`;
+    +rows.map((t,n)=>`<tr class="pick" data-n="${n}"><td>${esc(t.sec)}</td><td>${localStr(t.tFill,mkt(t.sec).tz)}</td><td>${esc(t.plan)}</td><td>${t.dirShort?"шорт":"лонг"}</td><td class="r">${fmt(t.fill)}</td><td class="r">${fmt(t.stop)}</td><td class="r">${fmt(t.tp)}</td><td class="r">${fmt(t.exit)}</td><td>${esc(t.reason)}</td><td class="r ${t.gross>=0?"ok":"bad"}">${t.gross.toFixed(2)}</td><td class="r ${t.net>=0?"ok":"bad"}">${t.net.toFixed(2)}</td><td>${inPort.has(t)?"да":"нет"}</td></tr>`).join("")+`</tbody></table>`;
   $("trades").querySelectorAll("tr.pick").forEach(tr=>tr.addEventListener("click",()=>showTrade(rows[+tr.dataset.n],tr)));
   const tb=$("list").querySelector("tbody");tb.innerHTML="";
   const perSec={};TRADES.forEach(t=>{(perSec[t.sec]=perSec[t.sec]||[]).push(t)});
@@ -932,11 +990,11 @@ function renderTrades(){
 }
 function showTrade(t,tr){
   document.querySelectorAll("tr.sel").forEach(x=>x.classList.remove("sel"));if(tr)tr.classList.add("sel");
-  const series=t.kind==="intra"?DATA[t.sec].hourly.filter(b=>CORE_H.includes(b.hh)):DATA[t.sec].daily;
+  const series=t.kind==="intra"?DATA[t.sec].hourly.filter(b=>b.core):DATA[t.sec].daily;
   const fi=series.findIndex(b=>b.t>=t.tFill);
   const touch=t.near?touchesOf(series,t.near,fi-60,fi+1):[];
   setChart(t.sec,t.kind,t.tFill,t.live||[],t,TRADES.filter(x=>x.sec===t.sec),touch);
-  $("explain").innerHTML=`<b>${esc(t.sec)} · ${esc(t.plan)} ${t.dirShort?"шорт":"лонг"}</b> по сигналу «${esc(t.signal)}»\nзаявка после бара ${mskStr(t.tDec-90e3)} · исполнение ${mskStr(t.tFill)} по ${fmt(t.fill)} · выход ${mskStr(t.tExit)} по ${fmt(t.exit)} — ${esc(t.reason)}\nуровень ${esc(t.level)} · стоп ${fmt(t.stop)} · тейк ${fmt(t.tp)} · R = ${fmt(t.R)} · до цели ${t.rr.toFixed(1)} стопов · тренд ${esc(t.trend)}${t.counter?" (контртренд)":""}\nрезультат: ${t.gross.toFixed(2)}R брутто, комиссия ${t.commR.toFixed(2)}R, ${t.net.toFixed(2)}R нетто\n\nмодель: подход — ${esc(t.mo.approach)}; ${esc(t.mo.signals.map(x=>`${x.name} — ${x.state}${x.act?" ("+x.act+")":""}`).join("; "))}`;
+  $("explain").innerHTML=`<b>${esc(t.sec)} · ${esc(t.plan)} ${t.dirShort?"шорт":"лонг"}</b> по сигналу «${esc(t.signal)}»\nзаявка после бара ${localStr(t.tDec-90e3,mkt(t.sec).tz)} · исполнение ${localStr(t.tFill,mkt(t.sec).tz)} по ${fmt(t.fill)} · выход ${localStr(t.tExit,mkt(t.sec).tz)} по ${fmt(t.exit)} — ${esc(t.reason)}\nуровень ${esc(t.level)} · стоп ${fmt(t.stop)} · тейк ${fmt(t.tp)} · R = ${fmt(t.R)} · до цели ${t.rr.toFixed(1)} стопов · тренд ${esc(t.trend)}${t.counter?" (контртренд)":""}\nрезультат: ${t.gross.toFixed(2)}R брутто, комиссия ${t.commR.toFixed(2)}R, ${t.net.toFixed(2)}R нетто\n\nмодель: подход — ${esc(t.mo.approach)}; ${esc(t.mo.signals.map(x=>`${x.name} — ${x.state}${x.act?" ("+x.act+")":""}`).join("; "))}`;
 }
 function exportCsv(){
   const head=["sec","kind","plan","signal","dir","placed","filled","exited","entry","fill","stop","tp","exit","reason","R","grossR","commR","netR","portfolio"];
@@ -948,6 +1006,7 @@ if(typeof document!=="undefined"){
   window.addEventListener("DOMContentLoaded",()=>{
     const today=new Date().toISOString().slice(0,10);$("till").value=today;$("from").value=addDays(today,-180);
     $("btnLoad").addEventListener("click",loadAll);$("btnTop").addEventListener("click",loadTop);
+    $("market").addEventListener("change",applyPreset);
     $("btnScreen").addEventListener("click",runScreen);$("btnSim").addEventListener("click",runSim);$("btnCsv").addEventListener("click",exportCsv);
     chartEvents();drawChart();drawEquity([]);
   });
